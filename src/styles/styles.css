@@ -47,18 +47,6 @@
   padding: 12px;
 }
 
-.connect-wallet-button {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 240px;
-  height: 40px;
-  background-color: #212b36;
-  color: white;
-  border-radius: 16px;
-  cursor: pointer;
-}
-
 .close-button {
   display: flex;
   justify-content: center;
@@ -122,8 +110,8 @@
 }
 
 .chain-icon {
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
 }
 
 .token-icon {
@@ -203,6 +191,10 @@
 .image-green-tick {
   width: 20px;
   height: 20px;
+}
+
+.hidden {
+  display: none;
 }
 
 .successful-section {

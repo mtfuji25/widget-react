@@ -1,2 +1,2 @@
 export { SubscriptionModal } from "./components/Modal";
-export { SubscriptionProvider } from "./context/SubscriptionProvider";
+export { SubscriptionProvider } from "./contexts/SubscriptionProvider";

@@ -1,30 +1,85 @@
-import React from "react";
-import { useAppKitWallet } from "@reown/appkit-wallet-button/react";
-import { useSubscription } from "../context/SubscriptionProvider";
+import React, { useEffect, useState } from "react";
+import { useSubscription } from "../contexts/SubscriptionProvider";
 import LogoIcon from "../assets/logo.svg";
 import SuccessIcon from "../assets/others/success.svg";
 import GreenTickIcon from "../assets/others/green-tick.svg";
-import { getAssets } from "../utils/resolver";
-import "./styles.css";
+import { getAssets } from "../utils";
+import { fetchNetworkFee } from "../utils/networkFee";
+import Skeleton from "react-loading-skeleton";
+import "react-loading-skeleton/dist/skeleton.css";
+import "../styles/styles.css";
 
 interface ModalProps {
   open: boolean;
   onClose: () => void;
+  useAppKitWalletHook: (options: {
+    onSuccess: () => void;
+    onError: (error: any) => void;
+  }) => {
+    isReady: boolean;
+    isPending: boolean;
+    connect: (method: string) => Promise<void>;
+  };
 }
 
-export const SubscriptionModal: React.FC<ModalProps> = ({ open, onClose }) => {
-  const {
-    walletAddress,
-    connectWallet,
-    approve,
-    subscribe,
-    subscriptionDetails,
-    isApproved,
-  } = useSubscription();
-  const { isReady, isPending, connect } = useAppKitWallet({
-    onSuccess: () => console.log("Wallet connected successfully!"),
-    onError: (error) => console.error("Wallet connection failed:", error),
-  });
+export const SubscriptionModal: React.FC<ModalProps> = ({
+  open,
+  onClose,
+  useAppKitWalletHook,
+}) => {
+  const { subscriptionDetails } = useSubscription();
+  const [chainIcon, setChainIcon] = useState<string>("");
+  const [tokenIcon, setTokenIcon] = useState<string>("");
+  const [networkFee, setNetworkFee] = useState<{
+    fee: string;
+    usdValue: string;
+  } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const chain = getAssets(subscriptionDetails.chain.toLowerCase(), "chain");
+    const token = getAssets(subscriptionDetails.token.toLowerCase(), "token");
+    setChainIcon(chain);
+    setTokenIcon(token);
+  }, [subscriptionDetails]);
+
+  useEffect(() => {
+    const fetchFee = async () => {
+      setIsLoading(true);
+
+      const chainId = resolveChainId(subscriptionDetails.chain);
+      if (!chainId) {
+        console.error("Unsupported chain:", subscriptionDetails.chain);
+        return;
+      }
+
+      const fee = await fetchNetworkFee(
+        chainId,
+        subscriptionDetails.chain,
+        "AXGpo1rd2MxpQvJCsUUaX54skWwcYctS"
+      );
+      setNetworkFee(fee);
+
+      setIsLoading(false);
+    };
+
+    fetchFee();
+  }, [subscriptionDetails.chain]);
+
+  const resolveChainId = (chain: string): number | null => {
+    const chainIdMap: Record<string, number> = {
+      ethereum: 1,
+      bnb: 56,
+      polygon: 137,
+      arbitrum: 42161,
+      avalanche: 43114,
+      base: 8453,
+    };
+
+    return chainIdMap[chain] || null;
+  };
+
+  if (!open) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -32,19 +87,7 @@ export const SubscriptionModal: React.FC<ModalProps> = ({ open, onClose }) => {
         <div className="modal-header">
           <div className="modal-header-container">
             <div className="wallet-section">
-              {!walletAddress ? (
-                <button
-                  className={`connect-wallet-button ${
-                    isPending ? "loading" : ""
-                  }`}
-                  onClick={() => connect("walletConnect")}
-                  disabled={!isReady || isPending}
-                >
-                  {isPending ? "Connecting..." : "Connect Wallet"}
-                </button>
-              ) : (
-                <></>
-              )}
+              {React.createElement("appkit-button")}
             </div>
             <div className="close-button" onClick={onClose}>
               <svg
@@ -63,58 +106,64 @@ export const SubscriptionModal: React.FC<ModalProps> = ({ open, onClose }) => {
           </div>
         </div>
         <div className="modal-body">
-          <div className="modal-body-container">
+          <div className="modal-body-container body-main">
             <div className="summary-section">
               <p className="summary-title">Summary</p>
               <div className="summary-detail">
                 <p className="detail-label">Subscription Cost:</p>
                 <div className="detail-icons">
                   <img
-                    src={getAssets(
-                      subscriptionDetails.chain.toLowerCase(),
-                      "chain"
-                    )}
+                    src={chainIcon}
                     alt="Chain Icon"
                     className="chain-icon"
                   />
                   <img
-                    src={getAssets(
-                      subscriptionDetails.token.toLowerCase(),
-                      "token"
-                    )}
+                    src={tokenIcon}
                     alt="Token Icon"
                     className="token-icon"
                   />
                 </div>
-                <p className="detail-value">{subscriptionDetails.cost}</p>
-                <p className="detail-usd-value">
-                  (~${subscriptionDetails.cost})
+                <p className="detail-value">
+                  {isLoading ? (
+                    <Skeleton width={80} />
+                  ) : (
+                    subscriptionDetails.cost
+                  )}
                 </p>
-                <p className="detail-pay-cycle">/month</p>
-              </div>
-              <div className="summary-detail">
-                <p className="detail-label">Expiration Period:</p>
-                <p className="detail-value">{subscriptionDetails.expiration}</p>
+                <p className="detail-usd-value">
+                  {isLoading ? (
+                    <Skeleton width={60} />
+                  ) : (
+                    `(~$${subscriptionDetails.cost})`
+                  )}
+                </p>
+                <p className="detail-pay-cycle">
+                  {subscriptionDetails.payCycle}
+                </p>
               </div>
               <div className="summary-detail">
                 <p className="detail-label">Network Fee:</p>
-                <p className="detail-value">0.0042583 MATIC</p>
-                <p className="detail-usd-value">(~$0.49)</p>
+                <p className="detail-value">
+                  {isLoading ? <Skeleton width={80} /> : networkFee?.fee}
+                </p>
+                <p className="detail-usd-value">
+                  {isLoading ? <Skeleton width={60} /> : networkFee?.usdValue}
+                </p>
               </div>
             </div>
-            <div className={`approve-button disabled`} onClick={approve}>
+            <div className={`approve-button`}>
               <p className="button-text">Approve</p>
               <img
                 src={GreenTickIcon}
                 alt="Approve Successful"
-                className="image-green-tick"
+                className="image-green-tick hidden"
               />
             </div>
-            <div className={`subscribe-button`} onClick={subscribe}>
+            <div className={`subscribe-button`}>
               <p className="button-text">Subscribe</p>
             </div>
           </div>
-          <div className="modal-body-container">
+          <div className="modal-body-container body-successful hidden">
             <div className="successful-section">
               <img
                 src={SuccessIcon}
