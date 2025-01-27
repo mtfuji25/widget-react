@@ -11,7 +11,7 @@ const projectId = "1eca0e2385e349a419a418e7ed0a8249";
 const metadata = {
   name: "WidgetReact",
   description: "Subscription Widget with Reown Integration",
-  url: "https://subscription-hub-ruddy.vercel.app/",
+  url: "https://widget-react-beta.vercel.app/",
   icons: ["https://avatars.githubusercontent.com/u/179229932"],
 };
 
