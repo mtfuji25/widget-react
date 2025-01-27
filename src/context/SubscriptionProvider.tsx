@@ -7,7 +7,7 @@ import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 
 const queryClient = new QueryClient();
 
-const projectId = "1eca0e2385e349a419a418e7ed0a8249";
+const projectId = "d51dd9927c077034c1b33839b31a5bf5";
 const metadata = {
   name: "WidgetReact",
   description: "Subscription Widget with Reown Integration",
