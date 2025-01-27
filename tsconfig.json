@@ -9,7 +9,14 @@
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
-    "moduleResolution": "Node"
+    "moduleResolution": "Node",
+    "skipLibCheck": true,
+    "resolveJsonModule": true
   },
-  "include": ["src"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/custom.d.ts",
+    "src/global.d.ts"
+  ]
 }
