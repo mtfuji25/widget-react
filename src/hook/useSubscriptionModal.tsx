@@ -7,28 +7,57 @@ import { USDC } from "../contracts/evm/USDC";
 import { PYUSD } from "../contracts/evm/PYUSD";
 import { useEffect, useState } from "react";
 import { fetchNetworkFee, getAssets } from "../utils";
-import { UseAppKitAccountReturn, UseAppKitNetworkReturn } from "@reown/appkit";
+import {
+  CaipNetwork,
+  UseAppKitAccountReturn,
+  UseAppKitNetworkReturn,
+} from "@reown/appkit";
+import { mainnet } from "viem/chains";
 
 export const useTokenDetails = (
   network: UseAppKitNetworkReturn,
   subscriptionDetails: SubscriptionDetails
 ) => {
-  const currentNetwork = networks.find((n) => n.chainId === network.chainId);
-  if (!currentNetwork) throw new Error("Unsupported network");
+  const defaultNetwork = networks.find((n) => n.chainId === 1);
+  if (!defaultNetwork) {
+    throw new Error(
+      "Default network (Ethereum) is missing in the configuration."
+    );
+  }
 
-  const tokenDetails = currentNetwork.tokens.find(
-    (t) => t.name.toLowerCase() === subscriptionDetails.token.toLowerCase()
+  const defaultToken = defaultNetwork.tokens.find(
+    (t) => t.name.toLowerCase() === "usdc"
   );
-  if (!tokenDetails) throw new Error("Unsupported token");
+  if (!defaultToken) {
+    throw new Error("Default token (USDC) is missing in the configuration.");
+  }
 
-  return { currentNetwork, tokenDetails };
+  const currentNetwork =
+    networks.find((n) => n.chainId === network.chainId) ?? defaultNetwork;
+
+  const tokenDetails =
+    currentNetwork.tokens.find(
+      (t) => t.name.toLowerCase() === subscriptionDetails.token.toLowerCase()
+    ) ?? defaultToken;
+
+  // Detect unsupported network or token
+  const isUnsupportedNetwork = !currentNetwork; // No matching network found
+  const isUnsupportedToken = !tokenDetails; // No matching token found
+
+  return {
+    currentNetwork,
+    tokenDetails,
+    isUnsupportedNetwork,
+    isUnsupportedToken,
+  };
 };
 
 export const useContractData = (
   contractAddress: Address,
   abi: any,
   functionName: string,
-  args: any[]
+  args: any[],
+  refetchInterval: number = 3000
 ) => {
   const { data } = useReadContract({
     address: contractAddress,
@@ -37,8 +66,8 @@ export const useContractData = (
     args,
     query: {
       enabled: !!contractAddress,
-      refetchInterval: 3000,
-      refetchIntervalInBackground: false,
+      refetchInterval,
+      refetchIntervalInBackground: true,
     },
   });
   return data ? BigInt(data.toString()) : null;
@@ -53,7 +82,7 @@ export const getTokenABI = (tokenName: string) => {
     case "PYUSD":
       return PYUSD;
     default:
-      throw new Error(`Unsupported token: ${tokenName}`);
+      return USDC;
   }
 };
 
@@ -67,9 +96,8 @@ export const useNetworkFee = (chainId: number, gas: number = 0) => {
   useEffect(() => {
     const fetchFee = async () => {
       setIsLoading(true);
-
       const fee = await fetchNetworkFee(
-        chainId,
+        chainId || 1, // Default to Ethereum Mainnet chainId
         "AXGpo1rd2MxpQvJCsUUaX54skWwcYctS"
       );
       setNetworkFee(fee);
@@ -77,7 +105,7 @@ export const useNetworkFee = (chainId: number, gas: number = 0) => {
     };
 
     fetchFee();
-  }, []);
+  }, [chainId]); // Refetch when chainId changes
 
   return { networkFee, isLoading };
 };
@@ -98,84 +126,59 @@ export const useAssets = (
     1: "ethereum",
   };
 
-  const chainName = nativeTokenIdMap[network.chainId as number];
-  if (!chainName) throw new Error(`Chain not found for chain ID: ${chainName}`);
+  const chainName = nativeTokenIdMap[network.chainId as number] || "ethereum";
 
   useEffect(() => {
     const chain = getAssets(chainName, "chain");
     const token = getAssets(subscriptionDetails.token.toLowerCase(), "token");
-    setChainIcon(chain);
-    setTokenIcon(token);
-  }, [subscriptionDetails]);
+    setChainIcon(chain || getAssets("ethereum", "chain")); // Default to Ethereum chain icon
+    setTokenIcon(token || getAssets("usdc", "token")); // Default to USDC token icon
+  }, [chainName, subscriptionDetails.token]);
 
   return { chainIcon, tokenIcon };
 };
 
 export const useSubscriptionInfo = (
-  network: any,
-  account: any,
+  network: UseAppKitNetworkReturn,
+  account: UseAppKitAccountReturn,
   subscriptionDetails: SubscriptionDetails
 ) => {
   const { tokenDetails } = useTokenDetails(network, subscriptionDetails);
-  const abi = getTokenABI(tokenDetails.name);
+
+  // Ensure ABI and addresses are available even for unsupported states
+  const abi = getTokenABI(tokenDetails?.name || "USDC"); // Default to USDC ABI
+  const papayaAddress = tokenDetails?.papayaAddress || "0x0";
+  const tokenAddress = tokenDetails?.ercAddress || "0x0";
 
   const papayaBalance = useContractData(
-    tokenDetails.papayaAddress as Address,
+    papayaAddress as Address,
     abi,
     "balanceOf",
     [account.address as Address]
   );
 
-  const allowance = useContractData(
-    tokenDetails.ercAddress as Address,
+  const allowance = useContractData(tokenAddress as Address, abi, "allowance", [
+    account.address as Address,
+    papayaAddress as Address,
+  ]);
+
+  const tokenBalance = useContractData(
+    tokenAddress as Address,
     abi,
-    "allowance",
-    [account.address as Address, tokenDetails.papayaAddress as Address]
+    "balanceOf",
+    [account.address as Address]
   );
 
   const needsDeposit =
     papayaBalance == null ||
     papayaBalance < parseUnits(subscriptionDetails.cost, 6);
+
   const depositAmount =
     papayaBalance != null
       ? parseUnits(subscriptionDetails.cost, 6) - papayaBalance
       : parseUnits(subscriptionDetails.cost, 6);
 
   const needsApproval = allowance == null || allowance < depositAmount;
-
-  return {
-    papayaBalance,
-    allowance,
-    needsDeposit,
-    depositAmount,
-    needsApproval,
-  };
-};
-
-export const useSubscriptionModal = (
-  network: UseAppKitNetworkReturn,
-  account: UseAppKitAccountReturn,
-  subscriptionDetails: SubscriptionDetails
-) => {
-  const { chainIcon, tokenIcon } = useAssets(network, subscriptionDetails);
-  const { networkFee, isLoading: isFeeLoading } = useNetworkFee(
-    network.chainId as number
-  );
-  const {
-    papayaBalance,
-    allowance,
-    needsDeposit,
-    depositAmount,
-    needsApproval,
-  } = useSubscriptionInfo(network, account, subscriptionDetails);
-  const { tokenDetails } = useTokenDetails(network, subscriptionDetails);
-  const abi = getTokenABI(tokenDetails.name);
-  const tokenBalance = useContractData(
-    tokenDetails.ercAddress as Address,
-    abi,
-    "balanceOf",
-    [account.address as Address]
-  );
 
   const hasSufficientBalance =
     tokenBalance != null && tokenBalance >= depositAmount;
@@ -185,23 +188,94 @@ export const useSubscriptionModal = (
     papayaBalance != null &&
     papayaBalance >= parseUnits(subscriptionDetails.cost, 6);
 
-  useEffect(() => {
-    if (!account.address || !network.caipNetwork) {
-    }
-  }, [account.address, network.caipNetwork]);
+  return {
+    papayaBalance,
+    allowance,
+    tokenBalance,
+    needsDeposit,
+    depositAmount,
+    needsApproval,
+    hasSufficientBalance,
+    canSubscribe,
+  };
+};
+
+export const useSubscriptionModal = (
+  network: UseAppKitNetworkReturn | null,
+  account: UseAppKitAccountReturn,
+  subscriptionDetails: SubscriptionDetails
+) => {
+  const defaultCaipNetwork: CaipNetwork = {
+    id: 1,
+    chainNamespace: "eip155",
+    caipNetworkId: "eip155:1",
+    name: "Ethereum",
+    nativeCurrency: {
+      name: "Ether",
+      symbol: "ETH",
+      decimals: 18,
+    },
+    rpcUrls: mainnet.rpcUrls,
+  };
+
+  const defaultNetwork: UseAppKitNetworkReturn = {
+    caipNetwork: defaultCaipNetwork,
+    chainId: 1,
+    caipNetworkId: "eip155:1",
+    switchNetwork: () => {},
+  };
+
+  const activeNetwork = network ?? defaultNetwork;
+
+  const { chainIcon, tokenIcon } = useAssets(
+    activeNetwork,
+    subscriptionDetails
+  );
+  const { networkFee, isLoading: isFeeLoading } = useNetworkFee(
+    activeNetwork.chainId as number
+  );
+
+  const { tokenDetails, isUnsupportedNetwork, isUnsupportedToken } =
+    useTokenDetails(activeNetwork, subscriptionDetails);
+
+  const fallbackValues = {
+    papayaBalance: null,
+    allowance: null,
+    tokenBalance: null,
+    needsDeposit: false,
+    depositAmount: BigInt(0),
+    needsApproval: false,
+    hasSufficientBalance: false,
+    canSubscribe: false,
+  };
+
+  const subscriptionInfo = useSubscriptionInfo(
+    activeNetwork,
+    account,
+    subscriptionDetails
+  );
+
+  if (isUnsupportedNetwork || isUnsupportedToken) {
+    return {
+      chainIcon: chainIcon || "",
+      tokenIcon: tokenIcon || "",
+      networkFee,
+      isFeeLoading,
+      ...fallbackValues,
+      isUnsupportedNetwork,
+      isUnsupportedToken,
+      tokenDetails,
+    };
+  }
 
   return {
     chainIcon,
     tokenIcon,
     networkFee,
     isFeeLoading,
-    papayaBalance,
-    allowance,
-    needsDeposit,
-    depositAmount,
-    needsApproval,
-    hasSufficientBalance,
-    canSubscribe,
-    tokenBalance,
+    ...subscriptionInfo,
+    isUnsupportedNetwork,
+    isUnsupportedToken,
+    tokenDetails,
   };
 };

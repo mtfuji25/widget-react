@@ -1,9 +1,10 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
 import { Address, parseUnits } from "viem";
 import Skeleton from "react-loading-skeleton";
 import LogoIcon from "../assets/logo.svg";
 import SuccessIcon from "../assets/others/success.svg";
+import FailIcon from "../assets/others/fail.svg";
 import { Approve } from "./Buttons/Approve";
 import { Deposit } from "./Buttons/Deposit";
 import { Subscribe } from "./Buttons/Subscribe";
@@ -11,7 +12,6 @@ import { SubscriptionDetails } from "../types";
 import {
   getTokenABI,
   useSubscriptionModal,
-  useTokenDetails,
 } from "../hook/useSubscriptionModal";
 import "react-loading-skeleton/dist/skeleton.css";
 import "../styles/styles.css";
@@ -27,7 +27,9 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
   onClose,
   subscriptionDetails,
 }) => {
-  if (!open) return null;
+  const [isSubscriptionSuccessful, setIsSubscriptionSuccessful] =
+    useState(false);
+  const [showError, setShowError] = useState(false);
 
   const account = useAppKitAccount();
   const network = useAppKitNetwork();
@@ -42,8 +44,27 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
     needsApproval,
     hasSufficientBalance,
     canSubscribe,
+    isUnsupportedNetwork,
+    isUnsupportedToken,
+    tokenDetails,
   } = useSubscriptionModal(network, account, subscriptionDetails);
-  const { tokenDetails } = useTokenDetails(network, subscriptionDetails);
+
+  useEffect(() => {
+    if (isUnsupportedNetwork || isUnsupportedToken) {
+      setShowError(true);
+    } else {
+      setShowError(false);
+    }
+  }, [isUnsupportedNetwork, isUnsupportedToken]);
+
+  useEffect(() => {
+    if (!open) {
+      setIsSubscriptionSuccessful(false);
+      setShowError(false);
+    }
+  }, [open]);
+
+  if (!open) return null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -70,57 +91,88 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
           </div>
         </div>
         <div className="modal-body">
-          <div className="modal-body-container body-main">
-            <div className="summary-section">
-              <p className="summary-title">Summary</p>
-              <div className="summary-detail">
-                <p className="detail-label">Subscription Cost:</p>
-                <div className="detail-icons">
-                  <img
-                    src={chainIcon}
-                    alt="Chain Icon"
-                    className="chain-icon"
-                  />
-                  <img
-                    src={tokenIcon}
-                    alt="Token Icon"
-                    className="token-icon"
-                  />
+          {!showError && !isSubscriptionSuccessful && (
+            <div className="modal-body-container body-main">
+              <div className="summary-section">
+                <p className="summary-title">Summary</p>
+                <div className="summary-detail">
+                  <p className="detail-label">Subscription Cost:</p>
+                  <div className="detail-icons">
+                    <img
+                      src={chainIcon}
+                      alt="Chain Icon"
+                      className="chain-icon"
+                    />
+                    <img
+                      src={tokenIcon}
+                      alt="Token Icon"
+                      className="token-icon"
+                    />
+                  </div>
+                  <p className="detail-value">
+                    {isFeeLoading ? (
+                      <Skeleton width={80} />
+                    ) : (
+                      subscriptionDetails.cost
+                    )}
+                  </p>
+                  <p className="detail-usd-value">
+                    {isFeeLoading ? (
+                      <Skeleton width={60} />
+                    ) : (
+                      `(~$${subscriptionDetails.cost})`
+                    )}
+                  </p>
+                  <p className="detail-pay-cycle">
+                    {subscriptionDetails.payCycle}
+                  </p>
                 </div>
-                <p className="detail-value">
-                  {isFeeLoading ? (
-                    <Skeleton width={80} />
-                  ) : (
-                    subscriptionDetails.cost
-                  )}
-                </p>
-                <p className="detail-usd-value">
-                  {isFeeLoading ? (
-                    <Skeleton width={60} />
-                  ) : (
-                    `(~$${subscriptionDetails.cost})`
-                  )}
-                </p>
-                <p className="detail-pay-cycle">
-                  {subscriptionDetails.payCycle}
-                </p>
+                <div className="summary-detail">
+                  <p className="detail-label">Network Fee:</p>
+                  <p className="detail-value">
+                    {isFeeLoading ? <Skeleton width={80} /> : networkFee?.fee}
+                  </p>
+                  <p className="detail-usd-value">
+                    {isFeeLoading ? (
+                      <Skeleton width={60} />
+                    ) : (
+                      networkFee?.usdValue
+                    )}
+                  </p>
+                </div>
               </div>
-              <div className="summary-detail">
-                <p className="detail-label">Network Fee:</p>
-                <p className="detail-value">
-                  {isFeeLoading ? <Skeleton width={80} /> : networkFee?.fee}
-                </p>
-                <p className="detail-usd-value">
-                  {isFeeLoading ? (
-                    <Skeleton width={60} />
-                  ) : (
-                    networkFee?.usdValue
-                  )}
-                </p>
-              </div>
-            </div>
-            {needsDeposit ? (
-              needsApproval ? (
+              {needsDeposit ? (
+                needsApproval ? (
+                  <>
+                    <Approve
+                      needsApproval={needsApproval}
+                      approvalAmount={parseUnits(subscriptionDetails.cost, 6)}
+                      abi={getTokenABI(tokenDetails.name)}
+                      tokenContractAddress={tokenDetails.ercAddress as Address}
+                      papayaAddress={tokenDetails.papayaAddress as Address}
+                      onSuccess={() => console.log("Approval successful!")}
+                    />
+                    <Subscribe
+                      canSubscribe={canSubscribe}
+                      abi={getTokenABI(tokenDetails.name)}
+                      toAddress={subscriptionDetails.toAddress as Address}
+                      subscriptionCost={parseUnits(subscriptionDetails.cost, 6)}
+                      papayaAddress={tokenDetails.papayaAddress as Address}
+                      onSuccess={() => setIsSubscriptionSuccessful(true)}
+                    />
+                  </>
+                ) : (
+                  <Deposit
+                    needsDeposit={needsDeposit}
+                    depositAmount={depositAmount}
+                    abi={getTokenABI(tokenDetails.name)}
+                    tokenContractAddress={tokenDetails.ercAddress as Address}
+                    papayaAddress={tokenDetails.papayaAddress as Address}
+                    hasSufficientBalance={hasSufficientBalance}
+                    onSuccess={() => console.log("Deposit successful!")}
+                  />
+                )
+              ) : (
                 <>
                   <Approve
                     needsApproval={needsApproval}
@@ -139,54 +191,55 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
                     onSuccess={() => console.log("Subscription successful!")}
                   />
                 </>
-              ) : (
-                <Deposit
-                  needsDeposit={needsDeposit}
-                  depositAmount={depositAmount}
-                  abi={getTokenABI(tokenDetails.name)}
-                  tokenContractAddress={tokenDetails.ercAddress as Address}
-                  papayaAddress={tokenDetails.papayaAddress as Address}
-                  hasSufficientBalance={hasSufficientBalance}
-                  onSuccess={() => console.log("Deposit successful!")}
-                />
-              )
-            ) : (
-              <>
-                <Approve
-                  needsApproval={needsApproval}
-                  approvalAmount={parseUnits(subscriptionDetails.cost, 6)}
-                  abi={getTokenABI(tokenDetails.name)}
-                  tokenContractAddress={tokenDetails.ercAddress as Address}
-                  papayaAddress={tokenDetails.papayaAddress as Address}
-                  onSuccess={() => console.log("Approval successful!")}
-                />
-                <Subscribe
-                  canSubscribe={canSubscribe}
-                  abi={getTokenABI(tokenDetails.name)}
-                  toAddress={subscriptionDetails.toAddress as Address}
-                  subscriptionCost={parseUnits(subscriptionDetails.cost, 6)}
-                  papayaAddress={tokenDetails.papayaAddress as Address}
-                  onSuccess={() => console.log("Subscription successful!")}
-                />
-              </>
-            )}
-          </div>
-          <div className="modal-body-container body-successful hidden">
-            <div className="successful-section">
-              <img
-                src={SuccessIcon}
-                alt="Subscription Successful"
-                className="success-icon"
-              />
-              <p className="thank-you-title">
-                Thank you for your subscription!
-              </p>
-              <p className="thank-you-text">
-                Now you can manage your subscription from a convenient
-                dashboard!
-              </p>
+              )}
             </div>
-          </div>
+          )}
+          {showError && isSubscriptionSuccessful && (
+            <div className="modal-body-container body-error">
+              <div className="error-section">
+                <img
+                  src={FailIcon}
+                  alt="Subscription Failed"
+                  className="fail-icon"
+                />
+                <p className="error-title">
+                  {isUnsupportedNetwork || isUnsupportedToken
+                    ? "Unsupported Chain or Token"
+                    : "Subscription Failed"}
+                </p>
+                {isUnsupportedNetwork ? (
+                  <p className="error-text">
+                    The selected network is not supported. Please switch to a
+                    supported network.
+                  </p>
+                ) : null}
+                {isUnsupportedToken ? (
+                  <p className="error-text">
+                    The selected token is not supported on this network. Please
+                    select a different token.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )}
+          {!showError && isSubscriptionSuccessful && (
+            <div className="modal-body-container body-successful">
+              <div className="successful-section">
+                <img
+                  src={SuccessIcon}
+                  alt="Subscription Successful"
+                  className="success-icon"
+                />
+                <p className="thank-you-title">
+                  Thank you for your subscription!
+                </p>
+                <p className="thank-you-text">
+                  Now you can manage your subscription from a convenient
+                  dashboard!
+                </p>
+              </div>
+            </div>
+          )}
         </div>
         <div className="modal-footer">
           <p className="footer-text">Powered by</p>

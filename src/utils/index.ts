@@ -111,47 +111,67 @@ export const fetchNetworkFee = async (
   authToken: string
 ): Promise<{ fee: string; usdValue: string } | null> => {
   try {
-    const network = networks.find((n) => n.chainId === chainId);
-    if (!network) throw new Error(`Unsupported chain ID: ${chainId}`);
+    // Default to Ethereum as the fallback network
+    const defaultNetwork = networks.find((n) => n.chainId === 1); // Ethereum Mainnet
+    if (!defaultNetwork) {
+      throw new Error(
+        "Default network (Ethereum) is missing in the configuration."
+      );
+    }
 
+    // Find the network for the given chainId or fallback to Ethereum
+    const network =
+      networks.find((n) => n.chainId === chainId) || defaultNetwork;
+
+    // Map chainId to token ID for price fetching
     const nativeTokenIdMap: Record<number, string> = {
       137: "matic-network",
-      56: "binancecoin",
       43114: "avalanche-2",
       8453: "ethereum",
       42161: "ethereum",
       1: "ethereum",
     };
 
-    const tokenId = nativeTokenIdMap[chainId];
-    if (!tokenId)
+    const tokenId = nativeTokenIdMap[chainId] || "ethereum"; // Default to Ethereum token ID
+    if (!tokenId) {
       throw new Error(`Token ID not found for chain ID: ${chainId}`);
+    }
 
+    // API request to Blocknative for gas prices
     const url = `https://api.blocknative.com/gasprices/blockprices?chainid=${chainId}`;
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${authToken}` },
     });
 
+    // Fetch the token price from an external API (e.g., CoinGecko)
     const nativeTokenPrice = await fetchTokenPrice(tokenId);
+
+    // Extract gas price information
     const blockPrices = response.data.blockPrices[0];
     const mediumConfidencePrice = blockPrices?.estimatedPrices.find(
       (price: { confidence: number }) => price.confidence === 90
     );
 
-    if (!mediumConfidencePrice)
-      throw new Error("No medium confidence gas price available");
+    if (!mediumConfidencePrice) {
+      throw new Error("No medium confidence gas price available.");
+    }
 
     const maxFeePerGas = parseFloat(mediumConfidencePrice.maxFeePerGas);
-    const gasFeeEther = maxFeePerGas / 1e9; // Convert Gwei to Ether
+    const gasFeeEther = maxFeePerGas / 1e9; // Convert from Gwei to Ether
     const gasFeeUsd = (gasFeeEther * nativeTokenPrice).toFixed(2);
 
     return {
-      fee: `${gasFeeEther.toFixed(12)} ${network.nativeToken}`, // Native token name
+      fee: `${gasFeeEther.toFixed(12)} ${network.nativeToken || "ETH"}`, // Fallback to "ETH"
       usdValue: `(~$${gasFeeUsd})`,
     };
   } catch (error) {
     console.error("Error fetching network fee:", error);
-    return null;
+
+    // Return default error values
+    return {
+      fee: "0.000000000000 ETH",
+      usdValue: "($0.00)",
+    };
   }
 };
 
