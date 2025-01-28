@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAppKitAccount, useAppKitNetwork } from "@reown/appkit/react";
 import { Address, parseUnits } from "viem";
+import isEqual from "lodash.isequal";
 import Skeleton from "react-loading-skeleton";
 import LogoIcon from "../assets/logo.svg";
 import SuccessIcon from "../assets/others/success.svg";
@@ -14,10 +15,10 @@ import {
   useNetworkFee,
   useSubscriptionModal,
 } from "../hook/useSubscriptionModal";
-import "react-loading-skeleton/dist/skeleton.css";
-import "../styles/styles.css";
 import { Papaya } from "../contracts/evm/Papaya";
 import { calculateSubscriptionRate } from "../utils";
+import "react-loading-skeleton/dist/skeleton.css";
+import "../styles/styles.css";
 
 interface ModalProps {
   open: boolean;
@@ -80,18 +81,28 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
         0,
       ];
 
+  function useDeepMemo<T>(value: T): T {
+    const ref = useRef<T | undefined>(undefined);
+    if (!isEqual(ref.current, value)) {
+      ref.current = value;
+    }
+    return ref.current as T;
+  }
+
+  const functionDetails = useDeepMemo({
+    abi,
+    address: address as Address,
+    functionName,
+    args,
+    account: account.address as Address,
+  });
+
   const { networkFee, isLoading: isFeeLoading } = useNetworkFee(
     open,
     account,
     network.chainId as number,
     "AXGpo1rd2MxpQvJCsUUaX54skWwcYctS",
-    {
-      abi,
-      address: address as Address,
-      functionName,
-      args,
-      account: account.address as Address,
-    }
+    functionDetails
   );
 
   useEffect(() => {

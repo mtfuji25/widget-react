@@ -5,8 +5,8 @@ import { networks } from "../constants/networks";
 import { USDT } from "../contracts/evm/USDT";
 import { USDC } from "../contracts/evm/USDC";
 import { PYUSD } from "../contracts/evm/PYUSD";
-import { useEffect, useRef, useState } from "react";
-import { fetchGasCost, fetchNetworkFee, getAssets } from "../utils";
+import { useEffect, useMemo, useState } from "react";
+import { fetchGasCost, getAssets, getChain } from "../utils";
 import {
   CaipNetwork,
   UseAppKitAccountReturn,
@@ -14,7 +14,6 @@ import {
 } from "@reown/appkit";
 import { mainnet } from "viem/chains";
 import { Papaya } from "../contracts/evm/Papaya";
-import * as chains from "viem/chains";
 
 export const useTokenDetails = (
   network: UseAppKitNetworkReturn,
@@ -106,36 +105,24 @@ export const useNetworkFee = (
     usdValue: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const hasFetched = useRef(false);
+  const memoizedAccount = useMemo(
+    () => ({
+      ...account,
+    }),
+    [account.address, account.status]
+  );
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchFee = async () => {
+      if (!open || !memoizedAccount?.address) return;
+
       try {
         setIsLoading(true);
-        
-        if (!open) return;
-        if (!account || !account.address) return;
-        if (hasFetched.current) return;
-
-        hasFetched.current = true;
-
-        function getChain(chainId: number) {
-          const chain = Object.values(chains).find((c) => c.id === chainId);
-          if (!chain) {
-            console.warn(
-              `Chain with id ${chainId} not found, defaulting to Ethereum`
-            );
-            return chains.mainnet;
-          }
-          return chain;
-        }
 
         const chain = getChain(chainId);
-
-        const publicClient = createPublicClient({
-          chain,
-          transport: http(),
-        });
+        const publicClient = createPublicClient({ chain, transport: http() });
 
         const estimatedGas = await publicClient.estimateContractGas({
           address: functionDetails.address,
@@ -145,41 +132,42 @@ export const useNetworkFee = (
           account: functionDetails.account,
         });
 
-        if (!estimatedGas) {
-          console.warn("Failed to estimate gas");
-          setNetworkFee({
-            fee: "0.000000000000 ETH",
-            usdValue: "($0.00)",
-          });
-          return;
+        if (isMounted) {
+          if (!estimatedGas) {
+            setNetworkFee({ fee: "0.000000000000 ETH", usdValue: "($0.00)" });
+            return;
+          }
+
+          const gasCost = await fetchGasCost(chainId, estimatedGas, authToken);
+
+          setNetworkFee(gasCost);
         }
-
-        const gasPriceData = await fetchNetworkFee(chainId, authToken);
-        if (!gasPriceData) {
-          console.warn("Failed to fetch gas price");
-          setNetworkFee({
-            fee: "0.000000000000 ETH",
-            usdValue: "($0.00)",
-          });
-          return;
-        }
-
-        const gasCost = await fetchGasCost(chainId, estimatedGas, authToken);
-
-        setNetworkFee(gasCost);
       } catch (error) {
         console.error("Error fetching network fee:", error);
-        setNetworkFee({
-          fee: "0.000000000000 ETH",
-          usdValue: "($0.00)",
-        });
+        if (isMounted) {
+          setNetworkFee({ fee: "0.000000000000 ETH", usdValue: "($0.00)" });
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     fetchFee();
-  }, [chainId, authToken, functionDetails]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [open, chainId, authToken, memoizedAccount?.address, functionDetails]);
+
+  useEffect(() => {
+    console.log("Effect dependencies:", {
+      open,
+      chainId,
+      authToken,
+      account,
+      functionDetails,
+    });
+  }, [open, chainId, authToken, account?.address, functionDetails]);
 
   return { networkFee, isLoading };
 };

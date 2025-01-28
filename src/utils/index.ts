@@ -20,7 +20,8 @@ import UsdtIcon from "../assets/tokens/usdt.svg";
 import UsdcIcon from "../assets/tokens/usdc.svg";
 import PyusdIcon from "../assets/tokens/pyusd.svg";
 import { SubscriptionPayCycle } from "../constants/enums";
-import { parseUnits } from "viem";
+import { Chain, parseUnits } from "viem";
+import * as chains from "viem/chains";
 
 // === Chain Icons Map ===
 const chainIcons: Record<string, string> = {
@@ -267,4 +268,13 @@ export const calculateSubscriptionRate = (
 
   // Multiply the per-second rate by the duration to get the total rate
   return cost / timeDurations[payCycle];
+};
+
+export const getChain = (chainId: number): Chain => {
+  const chain = Object.values(chains).find((c) => c.id === chainId);
+  if (!chain) {
+    console.warn(`Chain with id ${chainId} not found, defaulting to Ethereum`);
+    return chains.mainnet;
+  }
+  return chain;
 };
