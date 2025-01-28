@@ -1,28 +1,29 @@
-import React, { createContext, useContext } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
+import React from "react";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { createAppKit } from "@reown/appkit/react";
-import { SubscriptionProviderProps, SubscriptionContextType } from "../types";
-import { Chains, Tokens, SubscriptionPayCycle } from "../constants/enums";
-
-export const SubscriptionContext =
-  createContext<SubscriptionContextType | null>(null);
+import { SubscriptionProviderProps } from "../types";
+import { Config, cookieToInitialState, WagmiProvider } from "wagmi";
 
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
   children,
+  cookies,
+  wagmiAdapter,
+  queryClient,
   metadata,
   themeMode = "light",
   projectId,
   networks,
 }) => {
-  if (!projectId) {
-    throw new Error("Project ID is required for SubscriptionProvider.");
+  if (!wagmiAdapter || !wagmiAdapter.wagmiConfig) {
+    throw new Error(
+      "Invalid wagmiAdapter configuration. Please check your setup."
+    );
   }
 
-  const wagmiAdapter = new WagmiAdapter({
-    projectId,
-    networks,
-  });
+  const initialState = cookieToInitialState(
+    wagmiAdapter.wagmiConfig as Config,
+    cookies
+  );
 
   createAppKit({
     adapters: [wagmiAdapter],
@@ -42,33 +43,12 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
     },
   });
 
-  const queryClient = new QueryClient();
-
   return (
-    <QueryClientProvider client={queryClient}>
-      <SubscriptionContext.Provider
-        value={{
-          subscriptionDetails: {
-            toAddress: "0x9CAF1B9144A5eC3aE180539F4dcf404B2D91974b",
-            cost: 9.99,
-            chain: Chains.POLYGON,
-            token: Tokens.USDT,
-            payCycle: SubscriptionPayCycle.Monthly,
-          },
-        }}
-      >
-        {children}
-      </SubscriptionContext.Provider>
-    </QueryClientProvider>
+    <WagmiProvider
+      config={wagmiAdapter.wagmiConfig as Config}
+      initialState={initialState}
+    >
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    </WagmiProvider>
   );
-};
-
-export const useSubscription = () => {
-  const context = useContext(SubscriptionContext);
-  if (!context) {
-    throw new Error(
-      "useSubscription must be used within a SubscriptionProvider"
-    );
-  }
-  return context;
 };

@@ -1,6 +1,8 @@
 import { Chains, Tokens, SubscriptionPayCycle } from "../constants/enums";
 import { ThemeMode } from "@reown/appkit/react";
 import { AppKitNetwork } from "@reown/appkit/networks";
+import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
+import { QueryClient } from "@tanstack/react-query";
 
 export interface Metadata {
   name: string;
@@ -11,18 +13,17 @@ export interface Metadata {
 
 export interface SubscriptionDetails {
   toAddress: string;
-  cost: number;
+  cost: string;
   chain: Chains;
   token: Tokens;
   payCycle: SubscriptionPayCycle;
 }
 
-export interface SubscriptionContextType {
-  subscriptionDetails: SubscriptionDetails;
-}
-
 export interface SubscriptionProviderProps {
   children: React.ReactNode;
+  cookies?: string | null;
+  wagmiAdapter: WagmiAdapter;
+  queryClient: QueryClient;
   metadata: Metadata;
   themeMode: ThemeMode;
   projectId: string;
