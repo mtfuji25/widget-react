@@ -1,4 +1,4 @@
-import { Chains, Tokens, SubscriptionPayCycle } from "../constants/enums";
+import { SubscriptionPayCycle } from "../constants/enums";
 import { ThemeMode } from "@reown/appkit/react";
 import { AppKitNetwork } from "@reown/appkit/networks";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
@@ -14,8 +14,7 @@ export interface Metadata {
 export interface SubscriptionDetails {
   toAddress: string;
   cost: string;
-  chain: Chains;
-  token: Tokens;
+  token: string;
   payCycle: SubscriptionPayCycle;
 }
 

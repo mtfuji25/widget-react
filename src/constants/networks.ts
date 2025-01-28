@@ -20,6 +20,7 @@ export const networks = [
         startBlockNumber: "0x377D3BE",
       },
     ],
+    nativeToken: "POL",
     chainId: 137,
   },
   {
@@ -43,6 +44,7 @@ export const networks = [
         startBlockNumber: "0x25CB551",
       },
     ],
+    nativeToken: "BNB",
     chainId: 56,
   },
   {
@@ -66,6 +68,7 @@ export const networks = [
         startBlockNumber: "0x2C94010",
       },
     ],
+    nativeToken: "AVAX",
     chainId: 43114,
   },
   {
@@ -82,6 +85,7 @@ export const networks = [
         startBlockNumber: "0xF1818D",
       },
     ],
+    nativeToken: "ETH",
     chainId: 8453,
   },
   {
@@ -104,6 +108,7 @@ export const networks = [
         startBlockNumber: "0xD3C9A0E",
       },
     ],
+    nativeToken: "ETH",
     chainId: 42161,
   },
   {
@@ -127,6 +132,7 @@ export const networks = [
         startBlockNumber: "0x132C582",
       },
     ],
+    nativeToken: "ETH",
     chainId: 1,
   },
 ];

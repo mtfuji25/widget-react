@@ -1,84 +1,70 @@
-import { PAPAYA_ABI } from "@/lib/papayaAbi";
-import {
-  PAPAYA_CONTRACT_ADDRESS,
-  PAPAYA_PROJECT_ID,
-  SUBSCRIPTION_RATE,
-} from "@/utils/constants";
-import { UseAppKitAccountReturn } from "@reown/appkit";
-import { FormEvent, useEffect } from "react";
-import { Address, formatUnits } from "viem";
+import React, { FormEvent, useEffect } from "react";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { Abi, Address } from "viem";
 
 interface SubscribeProps {
-  account: UseAppKitAccountReturn;
+  canSubscribe: boolean;
+  abi: Abi;
   toAddress: Address;
-  setMessage: (msg: string | null) => void;
-  setError: (err: string | null) => void;
-  isDisabled?: boolean;
+  subscriptionCost: bigint;
+  papayaAddress: Address;
+  onSuccess: () => void;
 }
 
 export const Subscribe: React.FC<SubscribeProps> = ({
-  account,
+  canSubscribe,
+  abi,
   toAddress,
-  setMessage,
-  setError,
-  isDisabled = false,
+  subscriptionCost,
+  papayaAddress,
+  onSuccess,
 }) => {
   const {
     data: hash,
-    error,
     isError,
+    error,
     isPending,
     writeContract,
   } = useWriteContract();
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setMessage(null);
-    setError(null);
 
-    writeContract({
-      abi: PAPAYA_ABI,
-      address: PAPAYA_CONTRACT_ADDRESS,
-      functionName: "subscribe",
-      args: [toAddress, SUBSCRIPTION_RATE, PAPAYA_PROJECT_ID],
-    });
+    try {
+      writeContract({
+        abi,
+        address: papayaAddress,
+        functionName: "subscribe",
+        args: [toAddress, subscriptionCost, 0],
+      });
+    } catch (err) {
+      console.error("Subscription failed:", err);
+    }
   }
 
-  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({
-    hash,
-  });
+  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
 
-  // Handle state updates for transaction success
   useEffect(() => {
     if (isConfirmed) {
-      setMessage(
-        `Subscribed to ${toAddress} at rate=${formatUnits(
-          SUBSCRIPTION_RATE,
-          18
-        )} USDT per second.\n Check your streams: https://app.papaya.finance/wallet/${
-          account.address
-        }#Streams`
-      );
-      setError(null);
+      console.log("Subscription successfully created.");
+      onSuccess();
     }
-  }, [isConfirmed, setMessage, setError, toAddress, account.address]);
+  }, [isConfirmed, onSuccess]);
 
-  // Handle state updates for transaction error
   useEffect(() => {
     if (isError) {
-      setError(error?.message || "An unknown error occurred.");
+      console.error("Subscription error:", error?.message || "Unknown error");
     }
-  }, [isError, error, setError]);
+  }, [isError, error]);
 
   return (
-    <form onSubmit={submit}>
+    <form onSubmit={submit} style={{ width: "100%" }}>
       <button
         type="submit"
-        disabled={!account || isPending || isDisabled}
-        className="bg-blue-500 text-white px-3 py-2 rounded disabled:opacity-50"
+        disabled={!canSubscribe || isPending}
+        className={`subscribe-button ${!canSubscribe ? "disabled" : ""}`}
       >
-        Subscribe $1/day
+        <p className="button-text">Subscribe</p>
       </button>
     </form>
   );

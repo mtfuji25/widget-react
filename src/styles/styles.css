@@ -152,6 +152,7 @@
   width: 100%;
 }
 
+.deposit-button,
 .approve-button,
 .subscribe-button {
   display: flex;
@@ -167,13 +168,15 @@
   transition: background-color 0.3s ease, color 0.3s ease, transform 0.2s ease;
 }
 
+.deposit-button:hover,
 .approve-button:hover,
 .subscribe-button:hover {
   background-color: #2d3742;
   color: #ffffff;
-  transform: scale(1.02);
+  transform: scale(1.01);
 }
 
+.deposit-button.disabled,
 .approve-button.disabled,
 .subscribe-button.disabled {
   background-color: #e0e5e8;
@@ -181,9 +184,17 @@
   cursor: not-allowed;
 }
 
+.deposit-button:disabled:hover,
 .approve-button.disabled:hover,
 .subscribe-button.disabled:hover {
   transform: none;
+}
+
+.deposit-button:hover:not(.disabled),
+.approve-button:hover:not(.disabled),
+.subscribe-button:hover:not(.disabled) {
+  background-color: #34434f;
+  color: #ffffff;
 }
 
 .button-text {

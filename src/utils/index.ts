@@ -1,10 +1,41 @@
 // === Imports ===
-// General imports
-import React from "react";
-import axios from "axios";
 
-// Enums and constants
-import { Chains, ChainsNativeToken } from "../constants/enums";
+import { networks } from "../constants/networks";
+import axios from "axios";
+// Chain Icons
+import EthereumIcon from "../assets/chains/ethereum.svg";
+import BnbIcon from "../assets/chains/bnb.svg";
+import PolygonIcon from "../assets/chains/polygon.svg";
+import AvalancheIcon from "../assets/chains/avalanche.svg";
+import ArbitrumIcon from "../assets/chains/arbitrum.svg";
+import BaseIcon from "../assets/chains/base.svg";
+// Not used for now
+// import ScrollIcon from "../assets/chains/scroll.svg";
+// import ZkSyncIcon from "../assets/chains/zksync.svg";
+// import SeiIcon from "../assets/chains/sei.svg";
+// import SolanaIcon from "../assets/chains/solana.svg";
+// import TonIcon from "../assets/chains/ton.svg";
+// Token Icons
+import UsdtIcon from "../assets/tokens/usdt.svg";
+import UsdcIcon from "../assets/tokens/usdc.svg";
+import PyusdIcon from "../assets/tokens/pyusd.svg";
+
+// === Chain Icons Map ===
+const chainIcons: Record<string, string> = {
+  polygon: PolygonIcon,
+  bnb: BnbIcon,
+  avalanche: AvalancheIcon,
+  base: BaseIcon,
+  arbitrum: ArbitrumIcon,
+  ethereum: EthereumIcon,
+};
+
+// === Token Icons Map ===
+const tokenIcons: Record<string, string> = {
+  usdt: UsdtIcon,
+  usdc: UsdcIcon,
+  pyusd: PyusdIcon,
+};
 
 // === Formatting Utilities ===
 
@@ -31,86 +62,21 @@ export const formatNetworkFee = (fee: number, nativeToken: string): string => {
 
 // === Asset Management ===
 
-// Chain Icons
-import EthereumIcon from "../assets/chains/ethereum.svg";
-import BnbIcon from "../assets/chains/bnb.svg";
-import PolygonIcon from "../assets/chains/polygon.svg";
-import AvalancheIcon from "../assets/chains/avalanche.svg";
-import ArbitrumIcon from "../assets/chains/arbitrum.svg";
-import BaseIcon from "../assets/chains/base.svg";
-import ScrollIcon from "../assets/chains/scroll.svg";
-import ZkSyncIcon from "../assets/chains/zksync.svg";
-import SeiIcon from "../assets/chains/sei.svg";
-import SolanaIcon from "../assets/chains/solana.svg";
-import TonIcon from "../assets/chains/ton.svg";
-
-// Token Icons
-import UsdtIcon from "../assets/tokens/usdt.svg";
-import UsdcIcon from "../assets/tokens/usdc.svg";
-import PyusdIcon from "../assets/tokens/pyusd.svg";
-import { networks } from "../constants/networks";
-
 /**
- * Preload assets into maps for chains and tokens.
- */
-const chains: Record<string, string> = {
-  ethereum: EthereumIcon,
-  bnb: BnbIcon,
-  polygon: PolygonIcon,
-  avalanche: AvalancheIcon,
-  arbitrum: ArbitrumIcon,
-  base: BaseIcon,
-  scroll: ScrollIcon,
-  zksync: ZkSyncIcon,
-  sei: SeiIcon,
-  sol: SolanaIcon,
-  ton: TonIcon,
-};
-
-const tokens: Record<string, string> = {
-  usdt: UsdtIcon,
-  usdc: UsdcIcon,
-  pyusd: PyusdIcon,
-};
-
-/**
- * Get asset path for chain or token icons.
+ * Get the icon for a chain or token.
+ * @param key - The chain or token name.
+ * @param type - Type of asset: "chain" or "token".
+ * @returns Icon path or empty string if not found.
  */
 export const getAssets = (key: string, type: "chain" | "token"): string => {
-  try {
-    if (type === "chain") {
-      return chains[key.toLowerCase()] || "";
-    } else if (type === "token") {
-      return tokens[key.toLowerCase()] || "";
-    }
-    throw new Error("Invalid asset type. Must be 'chain' or 'token'.");
-  } catch (error) {
-    console.error(`Error fetching asset for key: ${key}, type: ${type}`, error);
-    return "";
+  const lowerKey = key.toLowerCase();
+  if (type === "chain") {
+    return chainIcons[lowerKey] || "";
+  } else if (type === "token") {
+    return tokenIcons[lowerKey] || "";
   }
-};
-
-// === Chain Utilities ===
-
-/**
- * Map chain names to their chain IDs.
- */
-export const resolveChainId = (chain: Chains): number | null => {
-  const chainIdMap: Record<Chains, number> = {
-    [Chains.ETHEREUM]: 1,
-    [Chains.BNBCHAIN]: 56,
-    [Chains.POLYGON]: 137,
-    [Chains.AVALANCHE]: 43114,
-    [Chains.ARBITRUM]: 42161,
-    [Chains.BASE]: 8453,
-    [Chains.SCROLL]: 534352,
-    [Chains.ZKSYNC]: 324,
-    [Chains.SEI]: 1329,
-    [Chains.SOLANA]: 101,
-    [Chains.TON]: 1234,
-  };
-
-  return chainIdMap[chain] ?? null;
+  console.error(`Invalid asset type: ${type}`);
+  return "";
 };
 
 // === API Utilities ===
@@ -135,64 +101,56 @@ export const fetchTokenPrice = async (tokenId: string): Promise<number> => {
 };
 
 /**
- * Fetch network fees using Blocknative API.
+ * Fetch network fees using Blocknative API and resolve token price.
+ * @param chainId - The chain ID of the network.
+ * @param authToken - Authorization token for the API.
+ * @returns Fee details or null if unavailable.
  */
 export const fetchNetworkFee = async (
   chainId: number,
-  chain: Chains,
   authToken: string
 ): Promise<{ fee: string; usdValue: string } | null> => {
   try {
-    const url = `https://api.blocknative.com/gasprices/blockprices?chainid=${chainId}`;
-    const response = await axios.get(url, {
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-      },
-    });
+    const network = networks.find((n) => n.chainId === chainId);
+    if (!network) throw new Error(`Unsupported chain ID: ${chainId}`);
 
-    const data = response.data;
-
-    // Resolve native token and its price
-    const nativeToken = ChainsNativeToken[chain];
-    const tokenIdMap: Record<Chains, string> = {
-      [Chains.ETHEREUM]: "ethereum",
-      [Chains.BNBCHAIN]: "binancecoin",
-      [Chains.POLYGON]: "matic-network",
-      [Chains.AVALANCHE]: "avalanche-2",
-      [Chains.ARBITRUM]: "ethereum",
-      [Chains.BASE]: "ethereum",
-      [Chains.SCROLL]: "ethereum",
-      [Chains.ZKSYNC]: "ethereum",
-      [Chains.SEI]: "sei-network",
-      [Chains.SOLANA]: "solana",
-      [Chains.TON]: "toncoin",
+    const nativeTokenIdMap: Record<number, string> = {
+      137: "matic-network",
+      56: "binancecoin",
+      43114: "avalanche-2",
+      8453: "ethereum",
+      42161: "ethereum",
+      1: "ethereum",
     };
 
-    const tokenId = tokenIdMap[chain];
-    const nativeTokenPrice = await fetchTokenPrice(tokenId);
+    const tokenId = nativeTokenIdMap[chainId];
+    if (!tokenId)
+      throw new Error(`Token ID not found for chain ID: ${chainId}`);
 
-    // Extract gas fee components
-    const blockPrices = data.blockPrices[0];
+    const url = `https://api.blocknative.com/gasprices/blockprices?chainid=${chainId}`;
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+
+    const nativeTokenPrice = await fetchTokenPrice(tokenId);
+    const blockPrices = response.data.blockPrices[0];
     const mediumConfidencePrice = blockPrices?.estimatedPrices.find(
       (price: { confidence: number }) => price.confidence === 90
     );
 
-    if (!mediumConfidencePrice) {
-      throw new Error(
-        "No gas price data available for medium confidence level."
-      );
-    }
+    if (!mediumConfidencePrice)
+      throw new Error("No medium confidence gas price available");
 
     const maxFeePerGas = parseFloat(mediumConfidencePrice.maxFeePerGas);
-    const gasFeeEther = maxFeePerGas / 1e9; // Convert from Gwei to Ether
+    const gasFeeEther = maxFeePerGas / 1e9; // Convert Gwei to Ether
     const gasFeeUsd = (gasFeeEther * nativeTokenPrice).toFixed(2);
 
     return {
-      fee: `${gasFeeEther.toFixed(6)} ${nativeToken}`,
+      fee: `${gasFeeEther.toFixed(12)} ${network.nativeToken}`, // Native token name
       usdValue: `(~$${gasFeeUsd})`,
     };
   } catch (error) {
-    console.error(`Error fetching network fee for chain ${chain}:`, error);
+    console.error("Error fetching network fee:", error);
     return null;
   }
 };
