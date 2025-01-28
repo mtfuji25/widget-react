@@ -11,11 +11,13 @@ import { Subscribe } from "./Buttons/Subscribe";
 import { SubscriptionDetails } from "../types";
 import {
   getTokenABI,
+  useNetworkFee,
   useSubscriptionModal,
 } from "../hook/useSubscriptionModal";
 import "react-loading-skeleton/dist/skeleton.css";
 import "../styles/styles.css";
 import { Papaya } from "../contracts/evm/Papaya";
+import { calculateSubscriptionRate } from "../utils";
 
 interface ModalProps {
   open: boolean;
@@ -40,8 +42,6 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
   const {
     chainIcon,
     tokenIcon,
-    networkFee,
-    isFeeLoading,
     needsDeposit,
     depositAmount,
     needsApproval,
@@ -51,6 +51,48 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
     isUnsupportedToken,
     tokenDetails,
   } = useSubscriptionModal(network, account, subscriptionDetails);
+
+  const functionName = needsApproval
+    ? "approve"
+    : needsDeposit
+    ? "deposit"
+    : "subscribe";
+
+  const abi =
+    functionName == "approve" ? getTokenABI(tokenDetails.name) : Papaya;
+  const address =
+    functionName == "approve"
+      ? tokenDetails.ercAddress
+      : tokenDetails.papayaAddress;
+  const args = needsApproval
+    ? [
+        tokenDetails.papayaAddress as Address,
+        parseUnits(subscriptionDetails.cost, 6),
+      ]
+    : needsDeposit
+    ? [depositAmount, false]
+    : [
+        subscriptionDetails.toAddress as Address,
+        calculateSubscriptionRate(
+          parseUnits(subscriptionDetails.cost, 18),
+          subscriptionDetails.payCycle
+        ),
+        0,
+      ];
+
+  const { networkFee, isLoading: isFeeLoading } = useNetworkFee(
+    open,
+    account,
+    network.chainId as number,
+    "AXGpo1rd2MxpQvJCsUUaX54skWwcYctS",
+    {
+      abi,
+      address: address as Address,
+      functionName,
+      args,
+      account: account.address as Address,
+    }
+  );
 
   useEffect(() => {
     if (isUnsupportedNetwork || isUnsupportedToken) {

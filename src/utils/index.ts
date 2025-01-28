@@ -134,7 +134,7 @@ export const fetchNetworkFee = async (
     }
 
     return {
-      gasPrice: mediumConfidencePrice.maxFeePerGas,
+      gasPrice: mediumConfidencePrice.maxFeePerGas.toString(),
       nativeToken: network.nativeToken,
     };
   } catch (error) {
@@ -175,16 +175,10 @@ export const fetchGasCost = async (
       };
     }
 
-    // Convert gasPrice (string) to a bigint in wei (18 decimals)
-    const gasPriceInWei = parseUnits(gasPrice, 9); // Convert Gwei (1e9) to wei
+    const gasPriceInWei = parseUnits(gasPrice, 9);
 
-    // Calculate gas cost in native tokens as a bigint
-    const gasCostInNativeToken = (estimatedGas * gasPriceInWei) / BigInt(1e18);
+    const gasCostInNativeToken = estimatedGas * gasPriceInWei;
 
-    // Convert gasCostInNativeToken (bigint) to number for USD calculation
-    const gasCostInNativeTokenAsNumber = Number(gasCostInNativeToken);
-
-    // Map chainId to token ID for price fetching
     const nativeTokenIdMap: Record<number, string> = {
       137: "matic-network",
       43114: "avalanche-2",
@@ -198,14 +192,23 @@ export const fetchGasCost = async (
       throw new Error(`Token ID not found for chain ID: ${chainId}`);
     }
 
-    const nativeTokenPrice = await fetchTokenPrice(tokenId);
+    const rawNativeTokenPrice = await fetchTokenPrice(tokenId);
 
-    // Calculate gas cost in USD
-    const gasCostInUsd = gasCostInNativeTokenAsNumber * nativeTokenPrice;
+    const nativeTokenPriceInWei = parseUnits(
+      rawNativeTokenPrice.toString(),
+      18
+    );
+
+    const gasCostInUsdBigInt =
+      (gasCostInNativeToken * nativeTokenPriceInWei) / BigInt(1e18);
+
+    const gasCostInNativeTokenAsNumber = Number(gasCostInNativeToken) / 1e18;
+
+    const gasCostInUsd = Number(gasCostInUsdBigInt) / 1e18;
 
     return {
-      fee: `${gasCostInNativeTokenAsNumber.toFixed(12)} ${nativeToken}`, // Fee in native token
-      usdValue: `(~$${gasCostInUsd.toFixed(2)})`, // Equivalent USD value
+      fee: `${gasCostInNativeTokenAsNumber.toFixed(12)} ${nativeToken}`,
+      usdValue: `(~$${gasCostInUsd.toFixed(2)})`,
     };
   } catch (error) {
     console.error("Error calculating gas cost:", error);

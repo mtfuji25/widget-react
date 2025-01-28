@@ -1,4 +1,4 @@
-import { useEstimateGas, useReadContract } from "wagmi";
+import { useReadContract } from "wagmi";
 import { SubscriptionDetails } from "../types";
 import { Abi, Address, createPublicClient, http, parseUnits } from "viem";
 import { networks } from "../constants/networks";
@@ -6,12 +6,7 @@ import { USDT } from "../contracts/evm/USDT";
 import { USDC } from "../contracts/evm/USDC";
 import { PYUSD } from "../contracts/evm/PYUSD";
 import { useEffect, useRef, useState } from "react";
-import {
-  calculateSubscriptionRate,
-  fetchGasCost,
-  fetchNetworkFee,
-  getAssets,
-} from "../utils";
+import { fetchGasCost, fetchNetworkFee, getAssets } from "../utils";
 import {
   CaipNetwork,
   UseAppKitAccountReturn,
@@ -19,7 +14,6 @@ import {
 } from "@reown/appkit";
 import { mainnet } from "viem/chains";
 import { Papaya } from "../contracts/evm/Papaya";
-import { estimateContractGas } from "viem/actions";
 import * as chains from "viem/chains";
 
 export const useTokenDetails = (
@@ -95,6 +89,8 @@ export const getTokenABI = (tokenName: string) => {
 };
 
 export const useNetworkFee = (
+  open: boolean,
+  account: UseAppKitAccountReturn,
   chainId: number,
   authToken: string,
   functionDetails: {
@@ -102,6 +98,7 @@ export const useNetworkFee = (
     address: Address;
     functionName: string;
     args: any[];
+    account: Address;
   }
 ) => {
   const [networkFee, setNetworkFee] = useState<{
@@ -114,10 +111,13 @@ export const useNetworkFee = (
   useEffect(() => {
     const fetchFee = async () => {
       try {
-        if (hasFetched.current) return;
-        hasFetched.current = true;
-
         setIsLoading(true);
+        
+        if (!open) return;
+        if (!account || !account.address) return;
+        if (hasFetched.current) return;
+
+        hasFetched.current = true;
 
         function getChain(chainId: number) {
           const chain = Object.values(chains).find((c) => c.id === chainId);
@@ -142,6 +142,7 @@ export const useNetworkFee = (
           abi: functionDetails.abi,
           functionName: functionDetails.functionName,
           args: functionDetails.args,
+          account: functionDetails.account,
         });
 
         if (!estimatedGas) {
@@ -325,51 +326,10 @@ export const useSubscriptionModal = (
     subscriptionDetails
   );
 
-  const functionName = subscriptionInfo.needsApproval
-    ? "approve"
-    : subscriptionInfo.needsDeposit
-    ? "deposit"
-    : "subscribe";
-
-  const abi =
-    functionName == "approve" ? getTokenABI(tokenDetails.name) : Papaya;
-  const address =
-    functionName == "approve"
-      ? tokenDetails.ercAddress
-      : tokenDetails.papayaAddress;
-  const args = subscriptionInfo.needsApproval
-    ? [
-        tokenDetails.papayaAddress as Address,
-        parseUnits(subscriptionDetails.cost, 6),
-      ]
-    : subscriptionInfo.needsDeposit
-    ? [subscriptionInfo.depositAmount, false]
-    : [
-        subscriptionDetails.toAddress as Address,
-        calculateSubscriptionRate(
-          parseUnits(subscriptionDetails.cost, 18),
-          subscriptionDetails.payCycle
-        ),
-        0,
-      ];
-
-  const { networkFee, isLoading: isFeeLoading } = useNetworkFee(
-    activeNetwork.chainId as number,
-    "AXGpo1rd2MxpQvJCsUUaX54skWwcYctS",
-    {
-      abi,
-      address: address as Address,
-      functionName,
-      args,
-    }
-  );
-
   if (isUnsupportedNetwork || isUnsupportedToken) {
     return {
       chainIcon: chainIcon || "",
       tokenIcon: tokenIcon || "",
-      networkFee,
-      isFeeLoading,
       ...fallbackValues,
       isUnsupportedNetwork,
       isUnsupportedToken,
@@ -380,8 +340,6 @@ export const useSubscriptionModal = (
   return {
     chainIcon,
     tokenIcon,
-    networkFee,
-    isFeeLoading,
     ...subscriptionInfo,
     isUnsupportedNetwork,
     isUnsupportedToken,
