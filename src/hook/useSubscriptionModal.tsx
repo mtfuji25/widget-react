@@ -1,18 +1,26 @@
-import { useReadContract } from "wagmi";
+import { useEstimateGas, useReadContract } from "wagmi";
 import { SubscriptionDetails } from "../types";
-import { Address, parseUnits } from "viem";
+import { Abi, Address, createPublicClient, http, parseUnits } from "viem";
 import { networks } from "../constants/networks";
 import { USDT } from "../contracts/evm/USDT";
 import { USDC } from "../contracts/evm/USDC";
 import { PYUSD } from "../contracts/evm/PYUSD";
-import { useEffect, useState } from "react";
-import { fetchNetworkFee, getAssets } from "../utils";
+import { useEffect, useRef, useState } from "react";
+import {
+  calculateSubscriptionRate,
+  fetchGasCost,
+  fetchNetworkFee,
+  getAssets,
+} from "../utils";
 import {
   CaipNetwork,
   UseAppKitAccountReturn,
   UseAppKitNetworkReturn,
 } from "@reown/appkit";
 import { mainnet } from "viem/chains";
+import { Papaya } from "../contracts/evm/Papaya";
+import { estimateContractGas } from "viem/actions";
+import * as chains from "viem/chains";
 
 export const useTokenDetails = (
   network: UseAppKitNetworkReturn,
@@ -57,7 +65,7 @@ export const useContractData = (
   abi: any,
   functionName: string,
   args: any[],
-  refetchInterval: number = 3000
+  refetchInterval: number = 1000
 ) => {
   const { data } = useReadContract({
     address: contractAddress,
@@ -86,26 +94,91 @@ export const getTokenABI = (tokenName: string) => {
   }
 };
 
-export const useNetworkFee = (chainId: number, gas: number = 0) => {
+export const useNetworkFee = (
+  chainId: number,
+  authToken: string,
+  functionDetails: {
+    abi: Abi;
+    address: Address;
+    functionName: string;
+    args: any[];
+  }
+) => {
   const [networkFee, setNetworkFee] = useState<{
     fee: string;
     usdValue: string;
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const hasFetched = useRef(false);
 
   useEffect(() => {
     const fetchFee = async () => {
-      setIsLoading(true);
-      const fee = await fetchNetworkFee(
-        chainId || 1, // Default to Ethereum Mainnet chainId
-        "AXGpo1rd2MxpQvJCsUUaX54skWwcYctS"
-      );
-      setNetworkFee(fee);
-      setIsLoading(false);
+      try {
+        if (hasFetched.current) return;
+        hasFetched.current = true;
+
+        setIsLoading(true);
+
+        function getChain(chainId: number) {
+          const chain = Object.values(chains).find((c) => c.id === chainId);
+          if (!chain) {
+            console.warn(
+              `Chain with id ${chainId} not found, defaulting to Ethereum`
+            );
+            return chains.mainnet;
+          }
+          return chain;
+        }
+
+        const chain = getChain(chainId);
+
+        const publicClient = createPublicClient({
+          chain,
+          transport: http(),
+        });
+
+        const estimatedGas = await publicClient.estimateContractGas({
+          address: functionDetails.address,
+          abi: functionDetails.abi,
+          functionName: functionDetails.functionName,
+          args: functionDetails.args,
+        });
+
+        if (!estimatedGas) {
+          console.warn("Failed to estimate gas");
+          setNetworkFee({
+            fee: "0.000000000000 ETH",
+            usdValue: "($0.00)",
+          });
+          return;
+        }
+
+        const gasPriceData = await fetchNetworkFee(chainId, authToken);
+        if (!gasPriceData) {
+          console.warn("Failed to fetch gas price");
+          setNetworkFee({
+            fee: "0.000000000000 ETH",
+            usdValue: "($0.00)",
+          });
+          return;
+        }
+
+        const gasCost = await fetchGasCost(chainId, estimatedGas, authToken);
+
+        setNetworkFee(gasCost);
+      } catch (error) {
+        console.error("Error fetching network fee:", error);
+        setNetworkFee({
+          fee: "0.000000000000 ETH",
+          usdValue: "($0.00)",
+        });
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     fetchFee();
-  }, [chainId]); // Refetch when chainId changes
+  }, [chainId, authToken, functionDetails]);
 
   return { networkFee, isLoading };
 };
@@ -152,7 +225,7 @@ export const useSubscriptionInfo = (
 
   const papayaBalance = useContractData(
     papayaAddress as Address,
-    papayaAddress,
+    Papaya,
     "balanceOf",
     [account.address as Address]
   );
@@ -231,9 +304,6 @@ export const useSubscriptionModal = (
     activeNetwork,
     subscriptionDetails
   );
-  const { networkFee, isLoading: isFeeLoading } = useNetworkFee(
-    activeNetwork.chainId as number
-  );
 
   const { tokenDetails, isUnsupportedNetwork, isUnsupportedToken } =
     useTokenDetails(activeNetwork, subscriptionDetails);
@@ -253,6 +323,45 @@ export const useSubscriptionModal = (
     activeNetwork,
     account,
     subscriptionDetails
+  );
+
+  const functionName = subscriptionInfo.needsApproval
+    ? "approve"
+    : subscriptionInfo.needsDeposit
+    ? "deposit"
+    : "subscribe";
+
+  const abi =
+    functionName == "approve" ? getTokenABI(tokenDetails.name) : Papaya;
+  const address =
+    functionName == "approve"
+      ? tokenDetails.ercAddress
+      : tokenDetails.papayaAddress;
+  const args = subscriptionInfo.needsApproval
+    ? [
+        tokenDetails.papayaAddress as Address,
+        parseUnits(subscriptionDetails.cost, 6),
+      ]
+    : subscriptionInfo.needsDeposit
+    ? [subscriptionInfo.depositAmount, false]
+    : [
+        subscriptionDetails.toAddress as Address,
+        calculateSubscriptionRate(
+          parseUnits(subscriptionDetails.cost, 18),
+          subscriptionDetails.payCycle
+        ),
+        0,
+      ];
+
+  const { networkFee, isLoading: isFeeLoading } = useNetworkFee(
+    activeNetwork.chainId as number,
+    "AXGpo1rd2MxpQvJCsUUaX54skWwcYctS",
+    {
+      abi,
+      address: address as Address,
+      functionName,
+      args,
+    }
   );
 
   if (isUnsupportedNetwork || isUnsupportedToken) {

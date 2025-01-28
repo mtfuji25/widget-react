@@ -1,26 +1,31 @@
-import React, { FormEvent, useEffect } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { Abi, Address } from "viem";
+import { networks } from "../../constants/networks";
 
 interface DepositProps {
+  chainId: number;
   needsDeposit: boolean;
   depositAmount: bigint;
   abi: Abi;
-  tokenContractAddress: Address;
   papayaAddress: Address;
   hasSufficientBalance: boolean;
-  onSuccess: () => void;
+  onSuccess?: () => void;
+  onError?: (title: string, description: string) => void;
 }
 
 export const Deposit: React.FC<DepositProps> = ({
+  chainId,
   needsDeposit,
   depositAmount,
   abi,
-  tokenContractAddress,
   papayaAddress,
   hasSufficientBalance,
-  onSuccess,
+  onSuccess = null,
+  onError = null,
 }) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const {
     data: hash,
     isError,
@@ -37,30 +42,40 @@ export const Deposit: React.FC<DepositProps> = ({
       return;
     }
 
-    try {
-      writeContract({
-        abi,
-        address: tokenContractAddress,
-        functionName: "transfer",
-        args: [papayaAddress, depositAmount],
-      });
-    } catch (err) {
-      console.error("Deposit failed:", err);
-    }
+    setIsProcessing(true);
+
+    writeContract({
+      abi,
+      address: papayaAddress,
+      functionName: "deposit",
+      args: [depositAmount, false],
+    });
   }
 
-  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+  const activeNetwork = networks.find((network) => network.chainId === chainId);
+  const defaultConfirmations = activeNetwork?.defaultConfirmations || 1;
+
+  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    confirmations: defaultConfirmations,
+    hash,
+  });
 
   useEffect(() => {
     if (isConfirmed) {
-      console.log("Tokens successfully deposited.");
-      onSuccess();
+      setIsProcessing(false);
+      if (onSuccess) {
+        onSuccess();
+      }
     }
   }, [isConfirmed, onSuccess]);
 
   useEffect(() => {
-    if (isError) {
-      console.error("Deposit error:", error?.message || "Unknown error");
+    if (isError && onError) {
+      onError(
+        "Failed to deposit",
+        error?.message || "An unknown error occurred."
+      );
+      setIsProcessing(false);
     }
   }, [isError, error]);
 
@@ -68,14 +83,25 @@ export const Deposit: React.FC<DepositProps> = ({
     <form onSubmit={submit} style={{ width: "100%" }}>
       <button
         type="submit"
-        disabled={!needsDeposit || !hasSufficientBalance || isPending}
+        disabled={
+          !needsDeposit || !hasSufficientBalance || isProcessing || isPending
+        }
         className={`deposit-button ${
-          !needsDeposit || !hasSufficientBalance ? "disabled" : ""
+          !needsDeposit || !hasSufficientBalance || isProcessing || isPending
+            ? "disabled"
+            : ""
         }`}
       >
-        <p className="button-text">
-          {hasSufficientBalance ? "Deposit" : "Insufficient Balance"}
-        </p>
+        {isProcessing || isPending ? (
+          <div className="spinner-container">
+            <div className="spinner"></div>
+            <p className="button-text">Processing...</p>
+          </div>
+        ) : (
+          <p className="button-text">
+            {hasSufficientBalance ? "Deposit" : "Insufficient Balance"}
+          </p>
+        )}
       </button>
     </form>
   );

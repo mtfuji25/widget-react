@@ -31,6 +31,8 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
   const [isSubscriptionSuccessful, setIsSubscriptionSuccessful] =
     useState(false);
   const [showError, setShowError] = useState(false);
+  const [errorTitle, setErrorTitle] = useState("");
+  const [errorDescription, setErrorDescription] = useState("");
 
   const account = useAppKitAccount();
   const network = useAppKitNetwork();
@@ -53,8 +55,24 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
   useEffect(() => {
     if (isUnsupportedNetwork || isUnsupportedToken) {
       setShowError(true);
+      if (isUnsupportedNetwork && !isUnsupportedToken) {
+        setErrorTitle("Unsupported network");
+        setErrorDescription(
+          "The selected network is not supported. Please switch to a supported network."
+        );
+      } else if (!isUnsupportedToken && isUnsupportedToken) {
+        setErrorTitle("Unsupported token");
+        setErrorDescription(
+          "The selected token is not supported on this network. Please select a different token."
+        );
+      } else {
+        setErrorTitle("Unsupported network and token");
+        setErrorDescription("The selected network and token is not supported.");
+      }
     } else {
       setShowError(false);
+      setErrorTitle("");
+      setErrorDescription("");
     }
   }, [isUnsupportedNetwork, isUnsupportedToken]);
 
@@ -68,7 +86,7 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
   if (!open) return null;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-container" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-header-container">
@@ -143,31 +161,67 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
                 </div>
               </div>
               <Approve
+                chainId={network.chainId as number}
                 needsApproval={needsApproval}
                 approvalAmount={parseUnits(subscriptionDetails.cost, 6)}
                 abi={getTokenABI(tokenDetails.name)}
                 tokenContractAddress={tokenDetails.ercAddress as Address}
                 papayaAddress={tokenDetails.papayaAddress as Address}
-                onSuccess={() => console.log("Approval successful!")}
+                onSuccess={() => {
+                  setIsSubscriptionSuccessful(false);
+                  setShowError(false);
+                  setErrorTitle("Token approval failed");
+                  setErrorDescription("");
+                }}
+                onError={(title, description) => {
+                  setIsSubscriptionSuccessful(false);
+                  setShowError(true);
+                  setErrorTitle(title);
+                  setErrorDescription(description);
+                }}
               />
               {needsDeposit ? (
                 <Deposit
+                  chainId={network.chainId as number}
                   needsDeposit={needsDeposit}
                   depositAmount={depositAmount}
                   abi={Papaya}
-                  tokenContractAddress={tokenDetails.ercAddress as Address}
                   papayaAddress={tokenDetails.papayaAddress as Address}
                   hasSufficientBalance={hasSufficientBalance}
-                  onSuccess={() => console.log("Deposit successful!")}
+                  onSuccess={() => {
+                    setIsSubscriptionSuccessful(false);
+                    setShowError(false);
+                    setErrorTitle("");
+                    setErrorDescription("");
+                  }}
+                  onError={(title, description) => {
+                    setIsSubscriptionSuccessful(false);
+                    setShowError(true);
+                    setErrorTitle(title);
+                    setErrorDescription(description);
+                  }}
                 />
               ) : (
                 <Subscribe
+                  chainId={network.chainId as number}
                   canSubscribe={canSubscribe}
                   abi={Papaya}
                   toAddress={subscriptionDetails.toAddress as Address}
-                  subscriptionCost={parseUnits(subscriptionDetails.cost, 6)}
+                  subscriptionCost={parseUnits(subscriptionDetails.cost, 18)}
+                  subscriptionCycle={subscriptionDetails.payCycle}
                   papayaAddress={tokenDetails.papayaAddress as Address}
-                  onSuccess={() => console.log("Subscription successful!")}
+                  onSuccess={() => {
+                    setIsSubscriptionSuccessful(true);
+                    setShowError(false);
+                    setErrorTitle("");
+                    setErrorDescription("");
+                  }}
+                  onError={(title, description) => {
+                    setIsSubscriptionSuccessful(false);
+                    setShowError(true);
+                    setErrorTitle(title);
+                    setErrorDescription(description);
+                  }}
                 />
               )}
             </div>
@@ -180,23 +234,8 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
                   alt="Subscription Failed"
                   className="fail-icon"
                 />
-                <p className="error-title">
-                  {isUnsupportedNetwork || isUnsupportedToken
-                    ? "Unsupported Chain or Token"
-                    : "Subscription Failed"}
-                </p>
-                {isUnsupportedNetwork ? (
-                  <p className="error-text">
-                    The selected network is not supported. Please switch to a
-                    supported network.
-                  </p>
-                ) : null}
-                {isUnsupportedToken ? (
-                  <p className="error-text">
-                    The selected token is not supported on this network. Please
-                    select a different token.
-                  </p>
-                ) : null}
+                <p className="error-title">{errorTitle}</p>
+                <p className="error-text">{errorDescription}</p>
               </div>
             </div>
           )}
@@ -213,7 +252,15 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
                 </p>
                 <p className="thank-you-text">
                   Now you can manage your subscription from a convenient
-                  dashboard!
+                  <a
+                    href="https://app.papaya.finance"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    dashboard
+                  </a>
+                  !
                 </p>
               </div>
             </div>

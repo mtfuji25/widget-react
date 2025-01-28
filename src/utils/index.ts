@@ -19,6 +19,8 @@ import BaseIcon from "../assets/chains/base.svg";
 import UsdtIcon from "../assets/tokens/usdt.svg";
 import UsdcIcon from "../assets/tokens/usdc.svg";
 import PyusdIcon from "../assets/tokens/pyusd.svg";
+import { SubscriptionPayCycle } from "../constants/enums";
+import { parseUnits } from "viem";
 
 // === Chain Icons Map ===
 const chainIcons: Record<string, string> = {
@@ -101,27 +103,86 @@ export const fetchTokenPrice = async (tokenId: string): Promise<number> => {
 };
 
 /**
- * Fetch network fees using Blocknative API and resolve token price.
- * @param chainId - The chain ID of the network.
- * @param authToken - Authorization token for the API.
- * @returns Fee details or null if unavailable.
+ * Fetches the current gas price for a given chain from Blocknative API.
+ * @param chainId The chain ID of the network.
+ * @param authToken The authentication token for the API.
+ * @returns Gas price in Gwei.
  */
 export const fetchNetworkFee = async (
   chainId: number,
   authToken: string
-): Promise<{ fee: string; usdValue: string } | null> => {
+): Promise<{ gasPrice: string; nativeToken: string } | null> => {
+  const network = networks.find((n) => n.chainId === chainId);
+  if (!network) {
+    throw new Error(`Unsupported chain ID: ${chainId}`);
+  }
+
   try {
-    // Default to Ethereum as the fallback network
-    const defaultNetwork = networks.find((n) => n.chainId === 1); // Ethereum Mainnet
-    if (!defaultNetwork) {
-      throw new Error(
-        "Default network (Ethereum) is missing in the configuration."
-      );
+    const url = `https://api.blocknative.com/gasprices/blockprices?chainid=${chainId}`;
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+
+    const blockPrices = response.data.blockPrices[0];
+    const mediumConfidencePrice = blockPrices?.estimatedPrices.find(
+      (price: { confidence: number }) => price.confidence === 90
+    );
+
+    if (!mediumConfidencePrice) {
+      console.warn("No medium confidence gas price available");
+      return null;
     }
 
-    // Find the network for the given chainId or fallback to Ethereum
-    const network =
-      networks.find((n) => n.chainId === chainId) || defaultNetwork;
+    return {
+      gasPrice: mediumConfidencePrice.maxFeePerGas,
+      nativeToken: network.nativeToken,
+    };
+  } catch (error) {
+    console.error("Error fetching gas price:", error);
+    return {
+      gasPrice: "0",
+      nativeToken: network.nativeToken,
+    };
+  }
+};
+
+/**
+ * Calculates the gas cost for a specific function execution.
+ * @param chainId The chain ID of the network.
+ * @param estimatedGas The estimated gas units for the function execution.
+ * @param authToken The authentication token for the API.
+ * @param nativeTokenPrice The price of the native token in USD.
+ * @returns The gas cost in native tokens and USD.
+ */
+export const fetchGasCost = async (
+  chainId: number,
+  estimatedGas: bigint,
+  authToken: string
+): Promise<{ fee: string; usdValue: string } | null> => {
+  try {
+    const networkFee = await fetchNetworkFee(chainId, authToken);
+
+    if (!networkFee) {
+      throw new Error("Failed to fetch gas price");
+    }
+
+    const { gasPrice, nativeToken } = networkFee;
+
+    if (gasPrice == "0") {
+      return {
+        fee: `0.000000000000 ${nativeToken}`,
+        usdValue: "($0.00)",
+      };
+    }
+
+    // Convert gasPrice (string) to a bigint in wei (18 decimals)
+    const gasPriceInWei = parseUnits(gasPrice, 9); // Convert Gwei (1e9) to wei
+
+    // Calculate gas cost in native tokens as a bigint
+    const gasCostInNativeToken = (estimatedGas * gasPriceInWei) / BigInt(1e18);
+
+    // Convert gasCostInNativeToken (bigint) to number for USD calculation
+    const gasCostInNativeTokenAsNumber = Number(gasCostInNativeToken);
 
     // Map chainId to token ID for price fetching
     const nativeTokenIdMap: Record<number, string> = {
@@ -132,42 +193,22 @@ export const fetchNetworkFee = async (
       1: "ethereum",
     };
 
-    const tokenId = nativeTokenIdMap[chainId] || "ethereum"; // Default to Ethereum token ID
+    const tokenId = nativeTokenIdMap[chainId] || "ethereum";
     if (!tokenId) {
       throw new Error(`Token ID not found for chain ID: ${chainId}`);
     }
 
-    // API request to Blocknative for gas prices
-    const url = `https://api.blocknative.com/gasprices/blockprices?chainid=${chainId}`;
-    const response = await axios.get(url, {
-      headers: { Authorization: `Bearer ${authToken}` },
-    });
-
-    // Fetch the token price from an external API (e.g., CoinGecko)
     const nativeTokenPrice = await fetchTokenPrice(tokenId);
 
-    // Extract gas price information
-    const blockPrices = response.data.blockPrices[0];
-    const mediumConfidencePrice = blockPrices?.estimatedPrices.find(
-      (price: { confidence: number }) => price.confidence === 90
-    );
-
-    if (!mediumConfidencePrice) {
-      throw new Error("No medium confidence gas price available.");
-    }
-
-    const maxFeePerGas = parseFloat(mediumConfidencePrice.maxFeePerGas);
-    const gasFeeEther = maxFeePerGas / 1e9; // Convert from Gwei to Ether
-    const gasFeeUsd = (gasFeeEther * nativeTokenPrice).toFixed(2);
+    // Calculate gas cost in USD
+    const gasCostInUsd = gasCostInNativeTokenAsNumber * nativeTokenPrice;
 
     return {
-      fee: `${gasFeeEther.toFixed(12)} ${network.nativeToken || "ETH"}`, // Fallback to "ETH"
-      usdValue: `(~$${gasFeeUsd})`,
+      fee: `${gasCostInNativeTokenAsNumber.toFixed(12)} ${nativeToken}`, // Fee in native token
+      usdValue: `(~$${gasCostInUsd.toFixed(2)})`, // Equivalent USD value
     };
   } catch (error) {
-    console.error("Error fetching network fee:", error);
-
-    // Return default error values
+    console.error("Error calculating gas cost:", error);
     return {
       fee: "0.000000000000 ETH",
       usdValue: "($0.00)",
@@ -198,4 +239,29 @@ export const getPapayaAddress = (chainId: number): string | null => {
   }
 
   return papayaAddress;
+};
+
+/**
+ * Calculate the subscription rate based on the period and per-second rate.
+ * @param cost - The rate per second (BigNumber or string with 18 decimals).
+ * @param payCycle - The payment cycle ("daily", "weekly", "monthly", "yearly").
+ * @returns The calculated subscription rate for the given pay cycle as a BigNumber.
+ */
+export const calculateSubscriptionRate = (
+  subscriptionCost: string | bigint,
+  payCycle: SubscriptionPayCycle
+): bigint => {
+  // Convert the rate to a BigNumber if it's not already
+  const cost = BigInt(subscriptionCost);
+
+  // Define time durations in seconds
+  const timeDurations: Record<SubscriptionPayCycle, bigint> = {
+    "/daily": BigInt(24 * 60 * 60), // 1 day = 24 hours * 60 minutes * 60 seconds
+    "/weekly": BigInt(7 * 24 * 60 * 60), // 7 days
+    "/monthly": BigInt(30 * 24 * 60 * 60), // 30 days
+    "/yearly": BigInt(365 * 24 * 60 * 60), // 365 days
+  };
+
+  // Multiply the per-second rate by the duration to get the total rate
+  return cost / timeDurations[payCycle];
 };

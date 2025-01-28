@@ -1,24 +1,35 @@
-import React, { FormEvent, useEffect } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { Abi, Address } from "viem";
+import { SubscriptionPayCycle } from "../../constants/enums";
+import { calculateSubscriptionRate } from "../../utils";
+import { networks } from "../../constants/networks";
 
 interface SubscribeProps {
+  chainId: number;
   canSubscribe: boolean;
   abi: Abi;
   toAddress: Address;
   subscriptionCost: bigint;
+  subscriptionCycle: SubscriptionPayCycle;
   papayaAddress: Address;
-  onSuccess: () => void;
+  onSuccess?: () => void;
+  onError?: (title: string, description: string) => void;
 }
 
 export const Subscribe: React.FC<SubscribeProps> = ({
+  chainId = 1,
   canSubscribe,
   abi,
   toAddress,
   subscriptionCost,
+  subscriptionCycle,
   papayaAddress,
-  onSuccess,
+  onSuccess = null,
+  onError = null,
 }) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const {
     data: hash,
     isError,
@@ -30,30 +41,45 @@ export const Subscribe: React.FC<SubscribeProps> = ({
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    try {
-      writeContract({
-        abi,
-        address: papayaAddress,
-        functionName: "subscribe",
-        args: [toAddress, subscriptionCost, 0],
-      });
-    } catch (err) {
-      console.error("Subscription failed:", err);
-    }
+    const subscriptionRate = calculateSubscriptionRate(
+      subscriptionCost,
+      subscriptionCycle
+    );
+
+    setIsProcessing(true);
+
+    writeContract({
+      abi,
+      address: papayaAddress,
+      functionName: "subscribe",
+      args: [toAddress, subscriptionRate, 0],
+    });
   }
 
-  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+  const activeNetwork = networks.find((network) => network.chainId === chainId);
+  const defaultConfirmations = activeNetwork?.defaultConfirmations || 1;
+
+  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    confirmations: defaultConfirmations,
+    hash,
+  });
 
   useEffect(() => {
     if (isConfirmed) {
-      console.log("Subscription successfully created.");
-      onSuccess();
+      setIsProcessing(false);
+      if (onSuccess) {
+        onSuccess();
+      }
     }
   }, [isConfirmed, onSuccess]);
 
   useEffect(() => {
-    if (isError) {
-      console.error("Subscription error:", error?.message || "Unknown error");
+    if (isError && onError) {
+      onError(
+        "Failed to subscribe",
+        error?.message || "An unknown error occurred."
+      );
+      setIsProcessing(false);
     }
   }, [isError, error]);
 
@@ -61,10 +87,19 @@ export const Subscribe: React.FC<SubscribeProps> = ({
     <form onSubmit={submit} style={{ width: "100%" }}>
       <button
         type="submit"
-        disabled={!canSubscribe || isPending}
-        className={`subscribe-button ${!canSubscribe ? "disabled" : ""}`}
+        disabled={!canSubscribe || isProcessing || isPending}
+        className={`subscribe-button ${
+          !canSubscribe || isProcessing || isPending ? "disabled" : ""
+        }`}
       >
-        <p className="button-text">Subscribe</p>
+        {isProcessing || isPending ? (
+          <div className="spinner-container">
+            <div className="spinner"></div>
+            <p className="button-text">Processing...</p>
+          </div>
+        ) : (
+          <p className="button-text">Subscribe</p>
+        )}
       </button>
     </form>
   );

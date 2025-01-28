@@ -1,25 +1,32 @@
-import React, { FormEvent, useEffect } from "react";
+import React, { FormEvent, useEffect, useState } from "react";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import GreenTickIcon from "../../assets/others/green-tick.svg";
 import { Abi, Address } from "viem";
+import { networks } from "../../constants/networks";
 
 interface ApproveProps {
+  chainId: number;
   needsApproval: boolean;
   approvalAmount: bigint;
   abi: Abi;
   tokenContractAddress: Address;
   papayaAddress: Address;
-  onSuccess: () => void;
+  onSuccess?: () => void;
+  onError?: (title: string, description: string) => void;
 }
 
 export const Approve: React.FC<ApproveProps> = ({
+  chainId,
   needsApproval,
   approvalAmount,
   abi,
   tokenContractAddress,
   papayaAddress,
-  onSuccess,
+  onSuccess = null,
+  onError = null,
 }) => {
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const {
     data: hash,
     isError,
@@ -31,30 +38,40 @@ export const Approve: React.FC<ApproveProps> = ({
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    try {
-      writeContract({
-        abi,
-        address: tokenContractAddress,
-        functionName: "approve",
-        args: [papayaAddress, approvalAmount],
-      });
-    } catch (err) {
-      console.error("Approval failed:", err);
-    }
+    setIsProcessing(true);
+
+    writeContract({
+      abi,
+      address: tokenContractAddress,
+      functionName: "approve",
+      args: [papayaAddress, approvalAmount],
+    });
   }
 
-  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash });
+  const activeNetwork = networks.find((network) => network.chainId === chainId);
+  const defaultConfirmations = activeNetwork?.defaultConfirmations || 1;
+
+  const { isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    confirmations: defaultConfirmations,
+    hash,
+  });
 
   useEffect(() => {
     if (isConfirmed) {
-      console.log("Tokens successfully approved.");
-      onSuccess();
+      setIsProcessing(false);
+      if (onSuccess) {
+        onSuccess();
+      }
     }
   }, [isConfirmed, onSuccess]);
 
   useEffect(() => {
-    if (isError) {
-      console.error("Approval error:", error?.message || "Unknown error");
+    if (isError && onError) {
+      onError(
+        "Failed to approve",
+        error?.message || "An unknown error occurred."
+      );
+      setIsProcessing(false);
     }
   }, [isError, error]);
 
@@ -62,16 +79,27 @@ export const Approve: React.FC<ApproveProps> = ({
     <form onSubmit={submit} style={{ width: "100%" }}>
       <button
         type="submit"
-        disabled={!needsApproval || isPending}
-        className={`approve-button ${!needsApproval ? "disabled" : ""}`}
+        disabled={!needsApproval || isProcessing || isPending}
+        className={`approve-button ${
+          !needsApproval || isProcessing || isPending ? "disabled" : ""
+        }`}
       >
-        <p className="button-text">Approve</p>
-        {isConfirmed && (
-          <img
-            src={GreenTickIcon}
-            alt="Approve Successful"
-            className="image-green-tick"
-          />
+        {isProcessing || isPending ? (
+          <div className="spinner-container">
+            <div className="spinner"></div>
+            <p className="button-text">Processing...</p>
+          </div>
+        ) : (
+          <>
+            <p className="button-text">Approve</p>
+            {isConfirmed && (
+              <img
+                src={GreenTickIcon}
+                alt="Approve Successful"
+                className="image-green-tick"
+              />
+            )}
+          </>
         )}
       </button>
     </form>

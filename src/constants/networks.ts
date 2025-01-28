@@ -22,6 +22,7 @@ export const networks = [
     ],
     nativeToken: "POL",
     chainId: 137,
+    defaultConfirmations: 6,
   },
   {
     name: "Binance Smart Chain",
@@ -46,6 +47,7 @@ export const networks = [
     ],
     nativeToken: "BNB",
     chainId: 56,
+    defaultConfirmations: 2,
   },
   {
     name: "Avalanche",
@@ -70,6 +72,7 @@ export const networks = [
     ],
     nativeToken: "AVAX",
     chainId: 43114,
+    defaultConfirmations: 2,
   },
   {
     name: "Base",
@@ -87,6 +90,7 @@ export const networks = [
     ],
     nativeToken: "ETH",
     chainId: 8453,
+    defaultConfirmations: 1,
   },
   {
     name: "ArbitrumOne",
@@ -110,6 +114,7 @@ export const networks = [
     ],
     nativeToken: "ETH",
     chainId: 42161,
+    defaultConfirmations: 1,
   },
   {
     name: "Ethereum",
@@ -134,5 +139,6 @@ export const networks = [
     ],
     nativeToken: "ETH",
     chainId: 1,
+    defaultConfirmations: 2,
   },
 ];

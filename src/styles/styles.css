@@ -197,10 +197,38 @@
   color: #ffffff;
 }
 
+.spinner-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #fff;
+  border-top: 2px solid #28a745;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
 .button-text {
   font-family: "Public Sans", sans-serif;
   font-size: 14px;
   font-weight: 700;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .modal-footer {
@@ -317,4 +345,8 @@
   width: 58px;
   height: 12px;
   margin-top: 4px;
+}
+
+.underline {
+  text-decoration: none;
 }
