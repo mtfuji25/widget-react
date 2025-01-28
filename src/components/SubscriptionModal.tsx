@@ -15,6 +15,7 @@ import {
 } from "../hook/useSubscriptionModal";
 import "react-loading-skeleton/dist/skeleton.css";
 import "../styles/styles.css";
+import { Papaya } from "../contracts/evm/Papaya";
 
 interface ModalProps {
   open: boolean;
@@ -141,56 +142,33 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
                   </p>
                 </div>
               </div>
+              <Approve
+                needsApproval={needsApproval}
+                approvalAmount={parseUnits(subscriptionDetails.cost, 6)}
+                abi={getTokenABI(tokenDetails.name)}
+                tokenContractAddress={tokenDetails.ercAddress as Address}
+                papayaAddress={tokenDetails.papayaAddress as Address}
+                onSuccess={() => console.log("Approval successful!")}
+              />
               {needsDeposit ? (
-                needsApproval ? (
-                  <>
-                    <Approve
-                      needsApproval={needsApproval}
-                      approvalAmount={parseUnits(subscriptionDetails.cost, 6)}
-                      abi={getTokenABI(tokenDetails.name)}
-                      tokenContractAddress={tokenDetails.ercAddress as Address}
-                      papayaAddress={tokenDetails.papayaAddress as Address}
-                      onSuccess={() => console.log("Approval successful!")}
-                    />
-                    <Subscribe
-                      canSubscribe={canSubscribe}
-                      abi={getTokenABI(tokenDetails.name)}
-                      toAddress={subscriptionDetails.toAddress as Address}
-                      subscriptionCost={parseUnits(subscriptionDetails.cost, 6)}
-                      papayaAddress={tokenDetails.papayaAddress as Address}
-                      onSuccess={() => setIsSubscriptionSuccessful(true)}
-                    />
-                  </>
-                ) : (
-                  <Deposit
-                    needsDeposit={needsDeposit}
-                    depositAmount={depositAmount}
-                    abi={getTokenABI(tokenDetails.name)}
-                    tokenContractAddress={tokenDetails.ercAddress as Address}
-                    papayaAddress={tokenDetails.papayaAddress as Address}
-                    hasSufficientBalance={hasSufficientBalance}
-                    onSuccess={() => console.log("Deposit successful!")}
-                  />
-                )
+                <Deposit
+                  needsDeposit={needsDeposit}
+                  depositAmount={depositAmount}
+                  abi={Papaya}
+                  tokenContractAddress={tokenDetails.ercAddress as Address}
+                  papayaAddress={tokenDetails.papayaAddress as Address}
+                  hasSufficientBalance={hasSufficientBalance}
+                  onSuccess={() => console.log("Deposit successful!")}
+                />
               ) : (
-                <>
-                  <Approve
-                    needsApproval={needsApproval}
-                    approvalAmount={parseUnits(subscriptionDetails.cost, 6)}
-                    abi={getTokenABI(tokenDetails.name)}
-                    tokenContractAddress={tokenDetails.ercAddress as Address}
-                    papayaAddress={tokenDetails.papayaAddress as Address}
-                    onSuccess={() => console.log("Approval successful!")}
-                  />
-                  <Subscribe
-                    canSubscribe={canSubscribe}
-                    abi={getTokenABI(tokenDetails.name)}
-                    toAddress={subscriptionDetails.toAddress as Address}
-                    subscriptionCost={parseUnits(subscriptionDetails.cost, 6)}
-                    papayaAddress={tokenDetails.papayaAddress as Address}
-                    onSuccess={() => console.log("Subscription successful!")}
-                  />
-                </>
+                <Subscribe
+                  canSubscribe={canSubscribe}
+                  abi={Papaya}
+                  toAddress={subscriptionDetails.toAddress as Address}
+                  subscriptionCost={parseUnits(subscriptionDetails.cost, 6)}
+                  papayaAddress={tokenDetails.papayaAddress as Address}
+                  onSuccess={() => console.log("Subscription successful!")}
+                />
               )}
             </div>
           )}

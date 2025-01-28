@@ -152,7 +152,7 @@ export const useSubscriptionInfo = (
 
   const papayaBalance = useContractData(
     papayaAddress as Address,
-    abi,
+    papayaAddress,
     "balanceOf",
     [account.address as Address]
   );
