@@ -26,5 +26,5 @@ export interface SubscriptionProviderProps {
   metadata: Metadata;
   themeMode: ThemeMode;
   projectId: string;
-  networks: [AppKitNetwork, ...AppKitNetwork[]];
+  networks: AppKitNetwork[];
 }

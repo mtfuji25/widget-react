@@ -90,7 +90,7 @@ export const Approve: React.FC<ApproveProps> = ({
         ) : (
           <>
             <p className="button-text">Approve</p>
-            {isConfirmed && (
+            {(isConfirmed || !needsApproval) && (
               <img
                 src={GreenTickIcon}
                 alt="Approve Successful"

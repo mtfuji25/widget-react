@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { createAppKit } from "@reown/appkit/react";
 import { SubscriptionProviderProps } from "../types";
 import { Config, cookieToInitialState, WagmiProvider } from "wagmi";
+import { AppKitNetwork } from "@reown/appkit/networks";
 
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
   children,
@@ -25,10 +26,15 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({
     cookies
   );
 
+  const tupledNetworks: [AppKitNetwork, ...AppKitNetwork[]] = networks as [
+    AppKitNetwork,
+    ...AppKitNetwork[]
+  ];
+
   createAppKit({
     adapters: [wagmiAdapter],
     projectId,
-    networks,
+    networks: tupledNetworks,
     defaultNetwork: networks[0],
     metadata,
     features: {
