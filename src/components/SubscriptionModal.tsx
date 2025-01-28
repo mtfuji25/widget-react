@@ -279,7 +279,7 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
               )}
             </div>
           )}
-          {showError && isSubscriptionSuccessful && (
+          {showError && !isSubscriptionSuccessful && (
             <div className="modal-body-container body-error">
               <div className="error-section">
                 <img

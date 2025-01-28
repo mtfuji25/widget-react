@@ -2,6 +2,7 @@ import React, { FormEvent, useEffect, useState } from "react";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { Abi, Address } from "viem";
 import { networks } from "../../constants/networks";
+import { getReadableErrorMessage } from "../../utils";
 
 interface DepositProps {
   chainId: number;
@@ -71,10 +72,7 @@ export const Deposit: React.FC<DepositProps> = ({
 
   useEffect(() => {
     if (isError && onError) {
-      onError(
-        "Failed to deposit",
-        error?.message || "An unknown error occurred."
-      );
+      onError("Failed to deposit", getReadableErrorMessage(error));
       setIsProcessing(false);
     }
   }, [isError, error]);

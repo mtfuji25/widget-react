@@ -159,16 +159,6 @@ export const useNetworkFee = (
     };
   }, [open, chainId, authToken, memoizedAccount?.address, functionDetails]);
 
-  useEffect(() => {
-    console.log("Effect dependencies:", {
-      open,
-      chainId,
-      authToken,
-      account,
-      functionDetails,
-    });
-  }, [open, chainId, authToken, account?.address, functionDetails]);
-
   return { networkFee, isLoading };
 };
 

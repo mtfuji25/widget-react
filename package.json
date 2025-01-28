@@ -1,7 +1,7 @@
 {
   "name": "@kazunetakeda25/widget-react",
   "type": "module",
-  "version": "1.0.80",
+  "version": "1.0.82",
   "description": "A component-based SDK for subscription payments",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",

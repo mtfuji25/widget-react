@@ -3,6 +3,7 @@ import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import GreenTickIcon from "../../assets/others/green-tick.svg";
 import { Abi, Address } from "viem";
 import { networks } from "../../constants/networks";
+import { getReadableErrorMessage } from "../../utils";
 
 interface ApproveProps {
   chainId: number;
@@ -67,10 +68,7 @@ export const Approve: React.FC<ApproveProps> = ({
 
   useEffect(() => {
     if (isError && onError) {
-      onError(
-        "Failed to approve",
-        error?.message || "An unknown error occurred."
-      );
+      onError("Failed to approve", getReadableErrorMessage(error));
       setIsProcessing(false);
     }
   }, [isError, error]);

@@ -2,7 +2,10 @@ import React, { FormEvent, useEffect, useState } from "react";
 import { useWaitForTransactionReceipt, useWriteContract } from "wagmi";
 import { Abi, Address } from "viem";
 import { SubscriptionPayCycle } from "../../constants/enums";
-import { calculateSubscriptionRate } from "../../utils";
+import {
+  calculateSubscriptionRate,
+  getReadableErrorMessage,
+} from "../../utils";
 import { networks } from "../../constants/networks";
 
 interface SubscribeProps {
@@ -75,10 +78,7 @@ export const Subscribe: React.FC<SubscribeProps> = ({
 
   useEffect(() => {
     if (isError && onError) {
-      onError(
-        "Failed to subscribe",
-        error?.message || "An unknown error occurred."
-      );
+      onError("Failed to subscribe", getReadableErrorMessage(error));
       setIsProcessing(false);
     }
   }, [isError, error]);

@@ -278,3 +278,76 @@ export const getChain = (chainId: number): Chain => {
   }
   return chain;
 };
+
+export const getReadableErrorMessage = (error: any): string => {
+  if (!error || typeof error !== "object") {
+    return "An unknown error occurred.";
+  }
+
+  if (error.message?.includes("User rejected the request")) {
+    return "The transaction was rejected by the user.";
+  }
+
+  if (error.message?.includes("insufficient funds")) {
+    return "The account has insufficient funds to complete this transaction.";
+  }
+
+  if (error.message?.includes("gas required exceeds allowance")) {
+    return "The transaction requires more gas than allowed.";
+  }
+
+  if (error.message?.includes("execution reverted")) {
+    return "The transaction was reverted by the contract. Check the input or contract state.";
+  }
+
+  if (error.message?.includes("network error")) {
+    return "A network error occurred. Please check your internet connection.";
+  }
+
+  if (error.message?.includes("chain mismatch")) {
+    return "You are connected to the wrong network. Please switch to the correct chain.";
+  }
+
+  if (error.message?.includes("invalid address")) {
+    return "An invalid address was provided. Please check the input.";
+  }
+
+  if (error.message?.includes("unsupported ABI")) {
+    return "The provided ABI is not supported.";
+  }
+
+  if (error.message?.includes("provider error")) {
+    return "An error occurred with the wallet provider. Please try again.";
+  }
+
+  if (error.message?.includes("contract not deployed")) {
+    return "The contract is not deployed on the selected network.";
+  }
+
+  if (error.message?.includes("max nonce")) {
+    return "The nonce for the transaction exceeds the allowed limit.";
+  }
+
+  if (error.message?.includes("invalid signature")) {
+    return "The transaction signature is invalid. Please try signing again.";
+  }
+
+  if (error.message?.includes("timeout")) {
+    return "The transaction request timed out. Please try again.";
+  }
+
+  if (error.message?.includes("failed to fetch")) {
+    return "Failed to connect to the blockchain. Please check your network and try again.";
+  }
+
+  if (error.message?.includes("call exception")) {
+    return "A call exception occurred. The contract may not support the called function.";
+  }
+
+  if (error.message?.includes("unknown error")) {
+    return "An unknown error occurred. Please try again later.";
+  }
+
+  // Default fallback for unhandled cases
+  return "An error occurred during the transaction. Please check the details and try again.";
+};
