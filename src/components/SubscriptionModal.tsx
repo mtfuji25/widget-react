@@ -213,20 +213,38 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
                   </p>
                 </div>
               </div>
-              {isFeeLoading ? (
-                <Skeleton className="button-loader" />
-              ) : (
-                <Approve
+              <Approve
+                chainId={network.chainId as number}
+                needsApproval={needsApproval}
+                approvalAmount={parseUnits(subscriptionDetails.cost, 6)}
+                abi={getTokenABI(tokenDetails.name)}
+                tokenContractAddress={tokenDetails.ercAddress as Address}
+                papayaAddress={tokenDetails.papayaAddress as Address}
+                onSuccess={() => {
+                  setIsSubscriptionSuccessful(false);
+                  setShowError(false);
+                  setErrorTitle("Token approval failed");
+                  setErrorDescription("");
+                }}
+                onError={(title, description) => {
+                  setIsSubscriptionSuccessful(false);
+                  setShowError(true);
+                  setErrorTitle(title);
+                  setErrorDescription(description);
+                }}
+              />
+              {needsDeposit ? (
+                <Deposit
                   chainId={network.chainId as number}
-                  needsApproval={needsApproval}
-                  approvalAmount={parseUnits(subscriptionDetails.cost, 6)}
-                  abi={getTokenABI(tokenDetails.name)}
-                  tokenContractAddress={tokenDetails.ercAddress as Address}
+                  needsDeposit={needsDeposit}
+                  depositAmount={depositAmount}
+                  abi={Papaya}
                   papayaAddress={tokenDetails.papayaAddress as Address}
+                  hasSufficientBalance={hasSufficientBalance}
                   onSuccess={() => {
                     setIsSubscriptionSuccessful(false);
                     setShowError(false);
-                    setErrorTitle("Token approval failed");
+                    setErrorTitle("");
                     setErrorDescription("");
                   }}
                   onError={(title, description) => {
@@ -236,34 +254,6 @@ export const SubscriptionModal: React.FC<ModalProps> = ({
                     setErrorDescription(description);
                   }}
                 />
-              )}
-              {needsDeposit ? (
-                isFeeLoading ? (
-                  <Skeleton className="button-loader" />
-                ) : (
-                  <Deposit
-                    chainId={network.chainId as number}
-                    needsDeposit={needsDeposit}
-                    depositAmount={depositAmount}
-                    abi={Papaya}
-                    papayaAddress={tokenDetails.papayaAddress as Address}
-                    hasSufficientBalance={hasSufficientBalance}
-                    onSuccess={() => {
-                      setIsSubscriptionSuccessful(false);
-                      setShowError(false);
-                      setErrorTitle("");
-                      setErrorDescription("");
-                    }}
-                    onError={(title, description) => {
-                      setIsSubscriptionSuccessful(false);
-                      setShowError(true);
-                      setErrorTitle(title);
-                      setErrorDescription(description);
-                    }}
-                  />
-                )
-              ) : isFeeLoading ? (
-                <Skeleton className="button-loader" />
               ) : (
                 <Subscribe
                   chainId={network.chainId as number}
