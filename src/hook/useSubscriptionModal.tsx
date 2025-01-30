@@ -121,17 +121,46 @@ export const useNetworkFee = (
         setIsLoading(true);
 
         const chain = getChain(chainId);
-        let publicClient;
-        if (chainId == 1) {
-          publicClient = createPublicClient({
-            chain,
-            transport: http(
-              "https://mainnet.infura.io/v3/9f3e336d09da4444bb0a109b6dc57009"
-            ),
-          });
-        } else {
-          publicClient = createPublicClient({ chain, transport: http() });
+
+        let chainPrefix = "mainnet";
+        
+        switch (chainId) {
+          case 1:
+            chainPrefix = "mainnet";
+            break;
+          case 56:
+            chainPrefix = "bsc-mainnet";
+            break;
+          case 137:
+            chainPrefix = "polygon-mainnet";
+            break;
+          case 43114:
+            chainPrefix = "avalanche-mainnet";
+            break;
+          case 8453:
+            chainPrefix = "base-mainnet";
+            break;
+          case 42161:
+            chainPrefix = "arbitrum-mainnet";
+            break;
+          default:
+            break;
         }
+
+        const publicClient = createPublicClient({
+          chain,
+          transport: http(
+            `https://${chainPrefix}.infura.io/v3/9f3e336d09da4444bb0a109b6dc57009`
+          ),
+        });
+
+        console.log("Params: ", {
+          address: functionDetails.address,
+          abi: functionDetails.abi,
+          functionName: functionDetails.functionName,
+          args: functionDetails.args,
+          account: functionDetails.account,
+        });
 
         const estimatedGas = await publicClient.estimateContractGas({
           address: functionDetails.address,
@@ -232,11 +261,12 @@ export const useSubscriptionInfo = (
 
   const needsDeposit =
     papayaBalance == null ||
-    papayaBalance < parseUnits(subscriptionDetails.cost, 6);
+    papayaBalance < parseUnits(subscriptionDetails.cost, 18);
 
   const depositAmount =
     papayaBalance != null
-      ? parseUnits(subscriptionDetails.cost, 6) - papayaBalance
+      ? parseUnits(subscriptionDetails.cost, 6) -
+        papayaBalance / parseUnits("1", 12)
       : parseUnits(subscriptionDetails.cost, 6);
 
   const needsApproval = allowance == null || allowance < depositAmount;
@@ -247,7 +277,7 @@ export const useSubscriptionInfo = (
   const canSubscribe =
     !needsDeposit &&
     papayaBalance != null &&
-    papayaBalance >= parseUnits(subscriptionDetails.cost, 6);
+    papayaBalance >= parseUnits(subscriptionDetails.cost, 18);
 
   return {
     papayaBalance,
