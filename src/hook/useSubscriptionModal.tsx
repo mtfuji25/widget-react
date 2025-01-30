@@ -123,7 +123,7 @@ export const useNetworkFee = (
         const chain = getChain(chainId);
 
         let chainPrefix = "mainnet";
-        
+
         switch (chainId) {
           case 1:
             chainPrefix = "mainnet";
@@ -152,14 +152,6 @@ export const useNetworkFee = (
           transport: http(
             `https://${chainPrefix}.infura.io/v3/9f3e336d09da4444bb0a109b6dc57009`
           ),
-        });
-
-        console.log("Params: ", {
-          address: functionDetails.address,
-          abi: functionDetails.abi,
-          functionName: functionDetails.functionName,
-          args: functionDetails.args,
-          account: functionDetails.account,
         });
 
         const estimatedGas = await publicClient.estimateContractGas({
@@ -195,7 +187,14 @@ export const useNetworkFee = (
     return () => {
       isMounted = false;
     };
-  }, [open, chainId, memoizedAccount?.address, functionDetails]);
+  }, [
+    open,
+    chainId,
+    memoizedAccount?.address,
+    functionDetails.abi,
+    functionDetails.functionName,
+    functionDetails.address,
+  ]);
 
   return { networkFee, isLoading };
 };
@@ -221,8 +220,8 @@ export const useAssets = (
   useEffect(() => {
     const chain = getAssets(chainName, "chain");
     const token = getAssets(subscriptionDetails.token.toLowerCase(), "token");
-    setChainIcon(chain || getAssets("ethereum", "chain")); // Default to Ethereum chain icon
-    setTokenIcon(token || getAssets("usdc", "token")); // Default to USDC token icon
+    setChainIcon(chain || getAssets("ethereum", "chain"));
+    setTokenIcon(token || getAssets("usdc", "token"));
   }, [chainName, subscriptionDetails.token]);
 
   return { chainIcon, tokenIcon };
@@ -235,8 +234,7 @@ export const useSubscriptionInfo = (
 ) => {
   const { tokenDetails } = useTokenDetails(network, subscriptionDetails);
 
-  // Ensure ABI and addresses are available even for unsupported states
-  const abi = getTokenABI(tokenDetails?.name || "USDC"); // Default to USDC ABI
+  const abi = getTokenABI(tokenDetails?.name || "USDC");
   const papayaAddress = tokenDetails?.papayaAddress || "0x0";
   const tokenAddress = tokenDetails?.ercAddress || "0x0";
 
@@ -264,10 +262,11 @@ export const useSubscriptionInfo = (
     papayaBalance < parseUnits(subscriptionDetails.cost, 18);
 
   const depositAmount =
-    papayaBalance != null
+    (papayaBalance != null
       ? parseUnits(subscriptionDetails.cost, 6) -
         papayaBalance / parseUnits("1", 12)
-      : parseUnits(subscriptionDetails.cost, 6);
+      : parseUnits(subscriptionDetails.cost, 6)) + parseUnits("0.01", 6); // Add some additional amount because of active subscriptions
+      // We many need to deposit full cost amount (but will discuss later)
 
   const needsApproval = allowance == null || allowance < depositAmount;
 
